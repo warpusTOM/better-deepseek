@@ -174,7 +174,7 @@
     const enabled = normalizeSearchProvidersSetting(raw);
     return SEARCH_PROVIDER_CATALOG.map((provider) => ({
       id: provider.id,
-      labelKey: `settings.searchProvider.${provider.id}`,
+      labelKey: provider.labelKey,
       name: provider.name,
       enabled: enabled.includes(provider.id),
     })).sort((a, b) => {

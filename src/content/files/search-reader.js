@@ -57,10 +57,21 @@ const SEARCH_PROVIDERS = [
   },
 ];
 
+/**
+ * i18n keys for provider labels, kept explicit so code ids (kebab-case) and
+ * locale keys (camelCase) can't drift apart again.
+ */
+const PROVIDER_LABEL_KEYS = {
+  "ddg-lite": "settings.searchProvider.ddgLite",
+  "ddg-html": "settings.searchProvider.ddgHtml",
+  "bing": "settings.searchProvider.bing",
+};
+
 /** Canonical id+label list for settings UI rendering (all providers, any state). */
 export const SEARCH_PROVIDER_CATALOG = SEARCH_PROVIDERS.map(({ id, name }) => ({
   id,
   name,
+  labelKey: PROVIDER_LABEL_KEYS[id],
 }));
 
 /**

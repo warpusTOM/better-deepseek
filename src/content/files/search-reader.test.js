@@ -19,6 +19,7 @@ import {
   resolveSearchProviders,
   SEARCH_PROVIDER_CATALOG,
 } from "./search-reader.js";
+import enMessages from "../../../src/locales/en.json";
 
 function readFileAsText(file) {
   return new Promise((resolve, reject) => {
@@ -319,10 +320,22 @@ describe("formatDeepFetchContent", () => {
 describe("resolveSearchProviders", () => {
   it("exposes a stable catalog of known providers", () => {
     expect(SEARCH_PROVIDER_CATALOG).toEqual([
-      { id: "ddg-lite", name: "DuckDuckGo Lite" },
-      { id: "ddg-html", name: "DuckDuckGo HTML" },
-      { id: "bing", name: "Bing" },
+      { id: "ddg-lite", name: "DuckDuckGo Lite", labelKey: "settings.searchProvider.ddgLite" },
+      { id: "ddg-html", name: "DuckDuckGo HTML", labelKey: "settings.searchProvider.ddgHtml" },
+      { id: "bing", name: "Bing", labelKey: "settings.searchProvider.bing" },
     ]);
+  });
+
+  it("resolves every catalog label key in the base locale", () => {
+    // Locale files wrap translations in a top-level `messages` object.
+    const messages = enMessages.messages ?? enMessages;
+    for (const { labelKey } of SEARCH_PROVIDER_CATALOG) {
+      const value = labelKey
+        .split(".")
+        .reduce((node, part) => (node ? node[part] : undefined), messages);
+      expect(value, labelKey).toBeTruthy();
+      expect(value, labelKey).not.toContain("searchProvider");
+    }
   });
 
   it("returns the default order when no preference is set", () => {
