@@ -794,26 +794,51 @@ class WebViewBridge(
             }
         }
 
-        httpClient.newCall(builder.build()).execute().use { resp ->
-            response.put("status", resp.code)
-            if (!resp.isSuccessful) {
-                response.put("ok", false)
-                response.put("error", "Server returned ${resp.code} for $url")
-                return
-            }
-            response.put("ok", true)
-            val bytes = resp.body?.bytes()
-            if (bytes != null) {
-                val charset = detectCharsetFromHeaders(resp) ?: detectCharsetFromHtml(bytes)
-                val html = try {
-                    String(bytes, Charset.forName(charset ?: "UTF-8"))
-                } catch (_: Exception) {
-                    String(bytes, Charset.forName("UTF-8"))
+        // Optional per-call budget mirroring the desktop service worker: a
+        // hanging provider must fail fast so the JS chain can move on to the
+        // next one (#148). Without this the shared client's 120s callTimeout
+        // would apply, blocking the bridged JS call for up to two minutes.
+        val callTimeoutMs = options?.optLong("timeoutMs", 0L)?.takeIf { it > 0L }
+        val client = if (callTimeoutMs != null) {
+            httpClient.newBuilder()
+                    .callTimeout(callTimeoutMs, TimeUnit.MILLISECONDS)
+                    .build()
+        } else {
+            httpClient
+        }
+
+        try {
+            client.newCall(builder.build()).execute().use { resp ->
+                response.put("status", resp.code)
+                if (!resp.isSuccessful) {
+                    response.put("ok", false)
+                    response.put("error", "Server returned ${resp.code} for $url")
+                    return
                 }
-                response.put("html", html)
-            } else {
-                response.put("html", "")
+                response.put("ok", true)
+                val bytes = resp.body?.bytes()
+                if (bytes != null) {
+                    val charset = detectCharsetFromHeaders(resp) ?: detectCharsetFromHtml(bytes)
+                    val html = try {
+                        String(bytes, Charset.forName(charset ?: "UTF-8"))
+                    } catch (_: Exception) {
+                        String(bytes, Charset.forName("UTF-8"))
+                    }
+                    response.put("html", html)
+                } else {
+                    response.put("html", "")
+                }
             }
+        } catch (e: java.io.IOException) {
+            response.put("ok", false)
+            response.put(
+                    "error",
+                    if (callTimeoutMs != null && e is java.net.SocketTimeoutException) {
+                        "Request timed out after ${callTimeoutMs}ms"
+                    } else {
+                        "Network error: ${e.message ?: e.javaClass.simpleName}"
+                    }
+            )
         }
     }
 

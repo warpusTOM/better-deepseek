@@ -99,4 +99,90 @@ describe("search-quality helpers", () => {
     expect(ranked.results).toHaveLength(1);
     expect(ranked.results[0].title).toBe("Daily Python release roundup");
   });
+
+  it("keeps Cyrillic and Turkish tokens intact instead of stripping them", () => {
+    const russian = extractSearchSignals("лучшие ноутбуки 2025");
+    expect(russian.importantTokens).toEqual(
+      expect.arrayContaining(["лучшие", "ноутбуки"])
+    );
+    expect(russian.years).toEqual(["2025"]);
+
+    const turkish = extractSearchSignals("şehir rehberi");
+    expect(turkish.importantTokens).toEqual(
+      expect.arrayContaining(["şehir", "rehberi"])
+    );
+  });
+
+  it("generates CJK bigrams for Chinese tokens", () => {
+    const signals = extractSearchSignals("量子计算机 原理");
+    expect(signals.importantTokens).toEqual(
+      expect.arrayContaining([
+        "量子计算机",
+        "量子",
+        "子计",
+        "计算",
+        "算机",
+        "原理",
+      ])
+    );
+  });
+
+  it("caps the number of important tokens", () => {
+    const manyWords = Array.from({ length: 50 }, (_, i) => `word${i}x`).join(" ");
+    expect(extractSearchSignals(manyWords).importantTokens.length).toBeLessThanOrEqual(32);
+  });
+
+  it("lets non-Latin queries reach strong-result thresholds", () => {
+    const ranked = rankSearchResults("лучшие ноутбуки 2025 для программистов", [
+      {
+        title: "Лучшие ноутбуки 2025 для программистов и разработчиков",
+        url: "https://example.com/luchshie-noutbuki-2025",
+        snippet: "Обзор лучших ноутбуков 2025 года для работы с кодом.",
+      },
+      {
+        title: "Ноутбук для программиста: как выбрать в 2025",
+        url: "https://example.com/vybor-noutbuka",
+        snippet: "Советы по выбору ноутбука для программистов.",
+      },
+      {
+        title: "Рейтинг ноутбуков 2025 — лучшие модели",
+        url: "https://example.com/rejting",
+        snippet: "Топ моделей этого года.",
+      },
+    ]);
+
+    expect(ranked.isStrongTopResult).toBe(true);
+    expect(ranked.passingCount).toBeGreaterThanOrEqual(3);
+  });
+
+  it("matches Chinese results through whole tokens and bigrams", () => {
+    const ranked = rankSearchResults("量子计算机 原理", [
+      {
+        title: "量子计算机的工作原理详解",
+        url: "https://example.com/quantum-principle",
+        snippet: "介绍量子计算机的基本原理与发展。",
+      },
+      {
+        title: "经典计算机与量子计算机的区别",
+        url: "https://example.com/difference",
+        snippet: "对比两类计算机的架构差异。",
+      },
+    ]);
+
+    expect(ranked.isStrongTopResult).toBe(true);
+    expect(ranked.results[0].title).toContain("量子计算机");
+  });
+
+  it("does not match Cyrillic words as prefixes inside longer words", () => {
+    const ranked = rankSearchResults("новости", [
+      {
+        title: "Новостной портал о технологиях",
+        url: "https://example.com/tehportal",
+        snippet: "Технологические материалы.",
+      },
+    ]);
+
+    // "новости" must not match inside "новостной" (word-boundary semantics).
+    expect(ranked.topScore).toBe(10);
+  });
 });

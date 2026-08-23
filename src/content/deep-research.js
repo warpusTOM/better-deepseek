@@ -13,7 +13,7 @@ import { normalizeHttpUrl } from "../lib/utils/url-normalizer.js";
 import state from "./state.js";
 import { clearRunSearchHistory, injectPureTextAndSend, sendFileWithMessage } from "./auto.js";
 import { fetchAndConvertWebPage } from "./files/web-reader.js";
-import { searchWeb } from "./files/search-reader.js";
+import { searchWeb, resolveSearchProviders } from "./files/search-reader.js";
 import {
   estimateDeepSeekTokens,
   recordOutgoingContext,
@@ -653,6 +653,7 @@ async function runCurrentStep(run) {
       }, {
         purpose: step.purpose,
         sourceType: step.sourceType,
+        providers: resolveSearchProviders(state.settings?.searchProviders),
       });
       if (result && result.file && result.results) {
         const text = await readFileText(result.file);
@@ -665,6 +666,7 @@ async function runCurrentStep(run) {
           provider: result.provider || "",
           effectiveQuery: result.effectiveQuery || "",
           rawResultCount: result.rawResultCount || result.results.length,
+          lowConfidence: result.lowConfidence === true,
           fileName: result.file.name,
           length: text.length,
           purpose: step.purpose,

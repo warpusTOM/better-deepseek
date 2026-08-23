@@ -123,6 +123,15 @@
       "contextGuardLimitHint": "Размер контекстного окна веб-чата DeepSeek. По умолчанию 128 000 токенов.",
       "contextGuardStopPercent": "Порог остановки (%)",
       "contextGuardStopPercentHint": "Останавливает Deep Research, когда оценка контекста достигает {{threshold}} токенов. Ограничено диапазоном 50-95%.",
+      "searchProviders": "Поисковые системы",
+      "searchProvidersHint": "Выберите и упорядочите поисковые системы для автоматического веб-поиска. Используется первая система, вернувшая достаточно релевантные результаты.",
+      "providerMoveUp": "Переместить выше",
+      "providerMoveDown": "Переместить ниже",
+      "searchProvider": {
+        "ddgLite": "DuckDuckGo (Lite)",
+        "ddgHtml": "DuckDuckGo (HTML)",
+        "bing": "Bing"
+      },
       "enabled": "Включено",
       "githubTokenHelp": "Создайте классический токен с областью repo в GitHub Settings -> Tokens.",
       "githubTokenShow": "Показать",
@@ -436,9 +445,10 @@
       "showOutput": "Показать вывод ▾"
     },
     "searchResult": {
-      "searching": "Поиск DuckDuckGo...",
       "resultsFor": "Результаты поиска: {{query}}",
-      "resultCount": "Найдено {{count}} результатов"
+      "resultCount": "Найдено {{count}} результатов",
+      "via": "через {{provider}}",
+      "lowConfidence": "Менее надёжные результаты — проверьте перед цитированием"
     },
     "fileReadResult": {
       "success": "Файл успешно прочитан",
@@ -742,7 +752,7 @@
       "skillActive": "Активный навык: <strong>{{name}}</strong>",
       "webFetchRequested": "Веб-страница загружается",
       "githubFetchRequested": "GitHub репозиторий загружается",
-      "searchRequested": "Поиск DuckDuckGo...",
+      "searchRequested": "Идёт поиск через {{provider}}...",
       "fileReadRequested": "Чтение файла кодовой базы...",
       "directorySearchRequested": "Поиск по кодовой базе...",
       "directoryListRequested": "Список каталога...",

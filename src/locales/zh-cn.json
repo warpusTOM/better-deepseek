@@ -129,6 +129,15 @@
       "contextGuardLimitHint": "DeepSeek 网页版会话的上下文窗口大小，默认为 128,000 tokens。",
       "contextGuardStopPercent": "停止阈值（%）",
       "contextGuardStopPercentHint": "当预估上下文用量达到 {{threshold}} tokens 时停止深度研究。取值范围为 50%–95%。",
+      "searchProviders": "搜索引擎",
+      "searchProvidersHint": "选择并排列自动网页搜索使用的引擎。返回高质量结果的引擎将被优先采用。",
+      "providerMoveUp": "上移搜索引擎",
+      "providerMoveDown": "下移搜索引擎",
+      "searchProvider": {
+        "ddgLite": "DuckDuckGo (Lite)",
+        "ddgHtml": "DuckDuckGo (HTML)",
+        "bing": "Bing"
+      },
       "collapseLongUserMessages": "折叠过长的用户消息",
       "collapseLongUserMessagesHint": "自动折叠过长的用户消息，点击“查看更多”展开。",
       "loadAllHistoryOnSession": "打开会话时加载全部历史记录",
@@ -435,9 +444,10 @@
       "showOutput": "显示输出 ▾"
     },
     "searchResult": {
-      "searching": "正在 DuckDuckGo 中搜索…",
       "resultsFor": "关于“{{query}}”的搜索结果",
-      "resultCount": "共找到 {{count}} 条结果"
+      "resultCount": "共找到 {{count}} 条结果",
+      "via": "来源：{{provider}}",
+      "lowConfidence": "低可信度结果——引用前请核实"
     },
     "fileReadResult": {
       "success": "文件读取成功",
@@ -741,7 +751,7 @@
       "skillActive": "当前技能：<strong>{{name}}</strong>",
       "webFetchRequested": "正在抓取网页",
       "githubFetchRequested": "正在抓取 GitHub 仓库",
-      "searchRequested": "正在调用 DuckDuckGo 搜索…",
+      "searchRequested": "正在使用 {{provider}} 搜索…",
       "fileReadRequested": "正在读取代码库文件…",
       "directorySearchRequested": "正在搜索代码库…",
       "directoryListRequested": "正在列出目录…",

@@ -13,6 +13,15 @@ const DUCKDUCKGO_HTML_SEARCH_URL = "https://html.duckduckgo.com/html/?q=";
 const BING_SEARCH_URL = "https://www.bing.com/search?q=";
 const MAX_DEEP_FETCH = 5;
 
+// Hard per-provider budget. A hanging provider (e.g. blocked or blackholed
+// host) must fail fast so the chain can move on to the next provider (#148).
+const SEARCH_PROVIDER_TIMEOUT_MS = 15_000;
+
+// Prepended when only weak-relevance results could be recovered — tells the
+// model to treat the evidence cautiously instead of citing it as fact (#148).
+const LOW_CONFIDENCE_NOTICE =
+  "> ⚠️ Low-confidence results: no search provider returned strongly relevant matches. Verify before citing.";
+
 const SEARCH_FETCH_OPTIONS = {
   method: "GET",
   headers: {
@@ -24,25 +33,57 @@ const SEARCH_FETCH_OPTIONS = {
   cache: "no-store",
   credentials: "omit",
   redirect: "follow",
+  timeoutMs: SEARCH_PROVIDER_TIMEOUT_MS,
 };
 
 const SEARCH_PROVIDERS = [
   {
-    name: "DuckDuckGo",
+    id: "ddg-lite",
+    name: "DuckDuckGo Lite",
     url: (query) => DUCKDUCKGO_SEARCH_URL + encodeURIComponent(query),
     parse: parseDuckDuckGoSearchResults,
   },
   {
-    name: "DuckDuckGo",
+    id: "ddg-html",
+    name: "DuckDuckGo HTML",
     url: (query) => DUCKDUCKGO_HTML_SEARCH_URL + encodeURIComponent(query),
     parse: parseDuckDuckGoSearchResults,
   },
   {
+    id: "bing",
     name: "Bing",
     url: (query) => BING_SEARCH_URL + encodeURIComponent(query),
     parse: parseBingSearchResults,
   },
 ];
+
+/** Canonical id+label list for settings UI rendering (all providers, any state). */
+export const SEARCH_PROVIDER_CATALOG = SEARCH_PROVIDERS.map(({ id, name }) => ({
+  id,
+  name,
+}));
+
+/**
+ * Resolve a user-configured provider order into an active provider list.
+ *
+ * Unknown ids are dropped, duplicates are removed, and a missing or fully
+ * invalid list falls back to the default order. Disabled providers stay
+ * disabled — the returned list is used verbatim by searchWeb.
+ */
+export function resolveSearchProviders(preferred) {
+  if (!Array.isArray(preferred)) return [...SEARCH_PROVIDERS];
+  const byId = new Map(SEARCH_PROVIDERS.map((provider) => [provider.id, provider]));
+  const seen = new Set();
+  const resolved = [];
+  for (const raw of preferred) {
+    const provider = byId.get(String(raw));
+    if (provider && !seen.has(provider.id)) {
+      resolved.push(provider);
+      seen.add(provider.id);
+    }
+  }
+  return resolved.length > 0 ? resolved : [...SEARCH_PROVIDERS];
+}
 
 function cleanSearchText(value) {
   return String(value || "").replace(/\s+/g, " ").trim();
@@ -255,7 +296,7 @@ function searchFailureMessage(errors) {
 /**
  * Format search results as a markdown document.
  */
-function formatSearchResults(query, results, provider = "DuckDuckGo") {
+function formatSearchResults(query, results, provider = "DuckDuckGo Lite") {
   const lines = [];
   lines.push(`# Search Results: ${query}`);
   lines.push("");
@@ -302,12 +343,14 @@ function formatDeepFetchContent(title, url, markdown) {
  *
  * @param {string} query - Search query
  * @param {number} [deepFetch=0] - Number of top results to also fetch full content for
- * @param {(status: string) => void} [onStatus] - Optional status callback
+ * @param {(status: string, info?: { phase: string, provider?: string }) => void} [onStatus] - Optional status callback
  * @typedef {{
  *   purpose?: string,
- *   sourceType?: "general"|"docs"|"news"|"reviews"|"academic"|"commerce"
+ *   sourceType?: "general"|"docs"|"news"|"reviews"|"academic"|"commerce",
+ *   providers?: string[]
  * }} SearchOptions
- * @param {SearchOptions} [options] - Optional query shaping and ranking hints
+ * @param {SearchOptions} [options] - Optional query shaping, ranking hints and
+ *   user-configured provider ids (see resolveSearchProviders)
  * @returns {Promise<{file: File, results: Array<{title: string, url: string, snippet: string}>, query: string, deepFetch: number, provider: string, effectiveQuery?: string, rawResultCount: number}>}
  */
 export {
@@ -328,16 +371,14 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
   const { normalizedQuery, effectiveQuery } = buildEffectiveSearchQuery(trimmedQuery, options);
   const providerQuery = effectiveQuery || normalizedQuery;
 
-  // Detect positive site: constraints for provider reorder and error messaging
+  // Detect positive site: constraints for error messaging
   const signals = extractSearchSignals(providerQuery);
   const hasSiteConstraint = signals.includeSites.length > 0;
   const siteDomains = hasSiteConstraint ? signals.includeSites.join(", ") : "";
 
-  // Reorder providers: Bing handles site: queries better, DDG is the default for general queries
-  const activeProviders = hasSiteConstraint
-    ? SEARCH_PROVIDERS.filter((p) => p.name === "Bing")
-        .concat(SEARCH_PROVIDERS.filter((p) => p.name !== "Bing"))
-    : SEARCH_PROVIDERS;
+  // Provider order is user-configured (settings.searchProviders); callers pass
+  // the resolved list. Falls back to the default order when not provided.
+  const activeProviders = resolveSearchProviders(options.providers);
 
   let providerName = "";
   let results = [];
@@ -346,7 +387,7 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
   let bestWeakResult = null;
 
   for (const provider of activeProviders) {
-    onStatus(`Searching ${provider.name}...`);
+    onStatus(`Searching ${provider.name}...`, { phase: "searching", provider: provider.name });
 
     let response;
     try {
@@ -365,7 +406,7 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
       continue;
     }
 
-    onStatus(`Parsing ${provider.name} results...`);
+    onStatus(`Parsing ${provider.name} results...`, { phase: "parsing", provider: provider.name });
     const parsedResults = provider.parse(response.html || "");
     if (parsedResults.length > 0) {
       const rankedResults = rankSearchResults(trimmedQuery, parsedResults, options);
@@ -408,12 +449,12 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
     );
   }
 
-  if (results.length === 0) {
-    if (bestWeakResult?.results?.length > 0) {
-      providerName = bestWeakResult.providerName;
-      results = bestWeakResult.results;
-      rawResultCount = bestWeakResult.rawResultCount;
-    }
+  let usedWeakFallback = false;
+  if (results.length === 0 && bestWeakResult?.results?.length > 0) {
+    usedWeakFallback = true;
+    providerName = bestWeakResult.providerName;
+    results = bestWeakResult.results;
+    rawResultCount = bestWeakResult.rawResultCount;
   }
 
   if (results.length === 0) {
@@ -430,9 +471,12 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
   }
 
   let output = formatSearchResults(trimmedQuery, results, providerName);
+  if (usedWeakFallback) {
+    output = LOW_CONFIDENCE_NOTICE + "\n\n" + output;
+  }
 
   if (safeDeepFetch > 0) {
-    onStatus(`Fetching content from top ${safeDeepFetch} results...`);
+    onStatus(`Fetching content from top ${safeDeepFetch} results...`, { phase: "deep-fetch" });
     const urlsToFetch = results.slice(0, safeDeepFetch);
 
     for (let i = 0; i < urlsToFetch.length; i++) {
@@ -452,7 +496,7 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
     }
   }
 
-  onStatus("Creating file...");
+  onStatus("Creating file...", { phase: "finalize" });
   const blob = new Blob([output], { type: "text/markdown" });
   const safeFilename =
     trimmedQuery
@@ -469,5 +513,6 @@ export async function searchWeb(query, deepFetch = 0, onStatus = () => {}, optio
     provider: providerName,
     effectiveQuery,
     rawResultCount: rawResultCount || results.length,
+    lowConfidence: usedWeakFallback,
   };
 }

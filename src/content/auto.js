@@ -5,7 +5,7 @@
 
 import { devLog } from "../lib/dev-log.js";
 import { fetchAndConvertWebPage } from "./files/web-reader.js";
-import { searchWeb } from "./files/search-reader.js";
+import { searchWeb, resolveSearchProviders } from "./files/search-reader.js";
 import { fetchGitHubRepo } from "./files/github-reader.js";
 import { fetchTwitterTweet } from "./files/twitter-reader.js";
 import { fetchYouTubeData } from "./files/youtube-reader.js";
@@ -425,7 +425,19 @@ export async function handleAutoYouTubeFetch(url) {
 }
 
 /**
- * Handles automatic web search requests via DuckDuckGo Lite.
+ * Broadcast a search status so UI cards (e.g. the auto:search request card)
+ * can live-update which provider is currently being queried.
+ */
+function emitSearchStatus(query, provider, phase, detail = "") {
+  try {
+    window.dispatchEvent(new CustomEvent("bds:search-status", {
+      detail: { query: normalizeSearchKeyPart(query), provider, phase, detail },
+    }));
+  } catch { /* non-DOM environment — ignore */ }
+}
+
+/**
+ * Handles automatic web search requests using the user-configured search providers.
  * @param {string} query - Search query
  * @param {number} [deepFetch=0] - Number of top results to also fetch full content for
  * @param {{ purpose?: string, sourceType?: "general"|"docs"|"news"|"reviews"|"academic"|"commerce" }} [options]
@@ -439,9 +451,13 @@ export async function handleAutoSearch(query, deepFetch = 0, options = {}) {
   devLog("Auto", `Starting automatic search for: ${q}${deepFetch > 0 ? ` (deepFetch=${deepFetch})` : ""}`);
 
   try {
-    const result = await searchWeb(q, deepFetch, (status) => {
+    const result = await searchWeb(q, deepFetch, (status, info) => {
       devLog("Auto", `Search Status: ${status}`);
-    }, options);
+      emitSearchStatus(q, info?.provider || "", info?.phase || "", status);
+    }, {
+      ...options,
+      providers: resolveSearchProviders(appState.settings?.searchProviders),
+    });
 
     if (!result?.file) {
       throw new Error("Search returned no file.");
@@ -455,6 +471,7 @@ export async function handleAutoSearch(query, deepFetch = 0, options = {}) {
       provider: result.provider,
       effectiveQuery: result.effectiveQuery,
       rawResultCount: result.rawResultCount,
+      lowConfidence: result.lowConfidence === true,
       purpose: options.purpose,
       sourceType: options.sourceType,
     });
@@ -506,9 +523,13 @@ export async function handleAutoSearchForRun(query, deepFetch = 0, runId = "", o
   devLog("Auto", `Starting run-scoped search for: ${q} (runId=${runId}, deepFetch=${deepFetch})`);
 
   try {
-    const result = await searchWeb(q, deepFetch, (status) => {
+    const result = await searchWeb(q, deepFetch, (status, info) => {
       devLog("Auto", `Search Status: ${status}`);
-    }, options);
+      emitSearchStatus(q, info?.provider || "", info?.phase || "", status);
+    }, {
+      ...options,
+      providers: resolveSearchProviders(appState.settings?.searchProviders),
+    });
 
     if (!result?.file) {
       throw new Error("Search returned no file.");
@@ -522,6 +543,7 @@ export async function handleAutoSearchForRun(query, deepFetch = 0, runId = "", o
       provider: result.provider,
       effectiveQuery: result.effectiveQuery,
       rawResultCount: result.rawResultCount,
+      lowConfidence: result.lowConfidence === true,
       purpose: options.purpose,
       sourceType: options.sourceType,
       runId,

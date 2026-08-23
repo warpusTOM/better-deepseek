@@ -10,6 +10,7 @@
   } from "../../lib/constants.js";
   import { getActiveProject, updateProject } from "../project-manager.js";
   import { t, i18n, availableLocaleCodes } from "../../lib/i18n.svelte.js";
+  import { SEARCH_PROVIDER_CATALOG } from "../files/search-reader.js";
   import { CSS_PRESETS } from "../../lib/constants.js";
   import { openNativeFilePicker } from "../files/native-file-input.js";
   import { encryptData, decryptData } from "../../lib/utils/crypto.js";
@@ -75,6 +76,8 @@
   let deepResearchContextGuardEnabled = $state(Boolean(appState.settings.deepResearchContextGuardEnabled));
   let deepResearchContextLimitTokens = $state(Number(appState.settings.deepResearchContextLimitTokens) || 128000);
   let deepResearchContextStopPercent = $state(Number(appState.settings.deepResearchContextStopPercent) || 70);
+  let searchProviderRows = $state(buildSearchProviderRows(appState.settings.searchProviders));
+  let activeSearchProviderCount = $derived(searchProviderRows.filter((row) => row.enabled).length);
   let locale = $state(appState.settings.locale || availableLocaleCodes[0] || "en");
   let syncLocale = $state(Boolean(appState.settings.syncLocale));
   let customCSS = $state(appState.settings.customCSS || "");
@@ -149,6 +152,61 @@
   ];
   let selectedSections = $state(new Set(EXPORT_SECTIONS.map(s => s.key)));
 
+  function normalizeSearchProvidersSetting(raw) {
+    const known = new Set(SEARCH_PROVIDER_CATALOG.map((provider) => provider.id));
+    const seen = new Set();
+    const enabled = [];
+    if (Array.isArray(raw)) {
+      for (const id of raw) {
+        const key = String(id);
+        if (known.has(key) && !seen.has(key)) {
+          enabled.push(key);
+          seen.add(key);
+        }
+      }
+    }
+    return enabled;
+  }
+
+  function buildSearchProviderRows(raw) {
+    // Enabled providers keep their configured order; disabled ones follow in
+    // canonical catalog order so every provider stays visible and toggleable.
+    const enabled = normalizeSearchProvidersSetting(raw);
+    return SEARCH_PROVIDER_CATALOG.map((provider) => ({
+      id: provider.id,
+      labelKey: `settings.searchProvider.${provider.id}`,
+      name: provider.name,
+      enabled: enabled.includes(provider.id),
+    })).sort((a, b) => {
+      const ai = enabled.indexOf(a.id);
+      const bi = enabled.indexOf(b.id);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return 0;
+    });
+  }
+
+  function enabledSearchProviderIds() {
+    return searchProviderRows.filter((row) => row.enabled).map((row) => row.id);
+  }
+
+  function toggleSearchProvider(row) {
+    if (row.enabled && activeSearchProviderCount <= 1) return;
+    searchProviderRows = searchProviderRows.map((candidate) =>
+      candidate.id === row.id ? { ...candidate, enabled: !candidate.enabled } : candidate
+    );
+  }
+
+  function moveSearchProvider(index, delta) {
+    const target = index + delta;
+    if (target < 0 || target >= searchProviderRows.length) return;
+    if (searchProviderRows[target].enabled !== searchProviderRows[index].enabled) return;
+    const next = [...searchProviderRows];
+    [next[index], next[target]] = [next[target], next[index]];
+    searchProviderRows = next;
+  }
+
   function captureFormSnapshot() {
     return JSON.stringify({
       autoFiles, autoZip, voiceMode, voiceLanguage, autoSubmitVoice,
@@ -160,6 +218,7 @@
       tokenPriceDisplay, showTimestamps, projectRagEnabled, projectRagLimit,
       processGitignoreOnUpload, injectSystemDateTime, skipDeletionConfirmation,
       deepResearchDeepFetch,
+      searchProviders: enabledSearchProviderIds(),
       mcpInlineMaxChars,
       locale, syncLocale, collapseLongUserMessages,
       loadAllHistoryOnSession, customCSS, disableTipBox
@@ -510,6 +569,8 @@
     ]},
     { key: 'subResearch', labelKey: 'settings.subResearch', settingKeys: [
       'settings.deepFetchPerSearch',
+      'settings.searchProviders', 'settings.searchProvider.ddgLite',
+      'settings.searchProvider.ddgHtml', 'settings.searchProvider.bing',
       'settings.contextGuardEnabled', 'settings.contextGuardLimit',
       'settings.contextGuardStopPercent',
     ]},
@@ -683,6 +744,7 @@
     projectRagEnabled = Boolean(appState.settings.projectRagEnabled);
     projectRagLimit = Number(appState.settings.projectRagLimit) || 5;
     deepResearchDeepFetch = Number(appState.settings.deepResearchDeepFetch) ?? 1;
+    searchProviderRows = buildSearchProviderRows(appState.settings.searchProviders);
     processGitignoreOnUpload = Boolean(appState.settings.processGitignoreOnUpload);
     injectSystemDateTime = Boolean(appState.settings.injectSystemDateTime);
     skipDeletionConfirmation = Boolean(appState.settings.skipDeletionConfirmation);
@@ -918,6 +980,11 @@
     appState.settings.injectSystemDateTime = injectSystemDateTime;
     appState.settings.skipDeletionConfirmation = skipDeletionConfirmation;
     appState.settings.deepResearchDeepFetch = Math.max(0, Math.min(5, Math.round(Number(deepResearchDeepFetch) || 0)));
+    // Never persist an empty provider list — fall back to the full default order.
+    const enabledProviders = enabledSearchProviderIds();
+    appState.settings.searchProviders = enabledProviders.length > 0
+      ? enabledProviders
+      : SEARCH_PROVIDER_CATALOG.map((provider) => provider.id);
     appState.settings.deepResearchContextGuardEnabled = deepResearchContextGuardEnabled;
     appState.settings.deepResearchContextLimitTokens = Math.max(16000, Math.min(1000000, Math.round(Number(deepResearchContextLimitTokens) || 128000)));
     appState.settings.deepResearchContextStopPercent = Math.max(50, Math.min(95, Math.round(Number(deepResearchContextStopPercent) || 70)));
@@ -1758,6 +1825,44 @@
           <p style="font-size: 10px; opacity: 0.5; margin: 0;">
             How many top search results Deep Research opens and adds as page evidence for each search step. Higher values improve source detail but spend context fast and may stop long runs earlier. Use 0 for results only, 1 for long research, 3+ for short high-detail runs.
           </p>
+        </div>
+
+        <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+          <span class="bds-toggle-label">{t('settings.searchProviders')}</span>
+          <div class="bds-search-provider-list" role="list">
+            {#each searchProviderRows as row, index (row.id)}
+              <div class="bds-search-provider-row" role="listitem">
+                <label class="bds-search-provider-label">
+                  <input
+                    type="checkbox"
+                    checked={row.enabled}
+                    disabled={row.enabled && activeSearchProviderCount <= 1}
+                    onchange={() => toggleSearchProvider(row)}
+                  />
+                  <span>{t(row.labelKey)}</span>
+                </label>
+                <span class="bds-search-provider-controls">
+                  <button
+                    type="button"
+                    class="bds-search-provider-move"
+                    aria-label={t('settings.providerMoveUp')}
+                    title={t('settings.providerMoveUp')}
+                    disabled={index === 0 || searchProviderRows[index - 1].enabled !== row.enabled}
+                    onclick={() => moveSearchProvider(index, -1)}
+                  >↑</button>
+                  <button
+                    type="button"
+                    class="bds-search-provider-move"
+                    aria-label={t('settings.providerMoveDown')}
+                    title={t('settings.providerMoveDown')}
+                    disabled={index === searchProviderRows.length - 1 || searchProviderRows[index + 1].enabled !== row.enabled}
+                    onclick={() => moveSearchProvider(index, 1)}
+                  >↓</button>
+                </span>
+              </div>
+            {/each}
+          </div>
+          <p style="font-size: 10px; opacity: 0.5; margin: 0;">{t('settings.searchProvidersHint')}</p>
         </div>
 
         <div class="bds-toggle-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
@@ -2661,5 +2766,67 @@
     text-align: right;
     color: var(--bds-text-primary);
     font-variant-numeric: tabular-nums;
+  }
+
+  .bds-search-provider-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .bds-search-provider-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 6px;
+    border-radius: 6px;
+    background: var(--bds-bg-hover, rgba(128, 128, 128, 0.08));
+  }
+
+  .bds-search-provider-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--bds-text-primary);
+    cursor: pointer;
+    min-width: 0;
+  }
+
+  .bds-search-provider-label input {
+    margin: 0;
+    accent-color: var(--bds-accent);
+  }
+
+  .bds-search-provider-controls {
+    display: flex;
+    gap: 4px;
+  }
+
+  .bds-search-provider-move {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--bds-border, rgba(128, 128, 128, 0.25));
+    border-radius: 5px;
+    background: transparent;
+    color: var(--bds-text-primary);
+    font-size: 11px;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .bds-search-provider-move:hover:not(:disabled) {
+    background: var(--bds-accent);
+    color: #fff;
+    border-color: var(--bds-accent);
+  }
+
+  .bds-search-provider-move:disabled {
+    opacity: 0.35;
+    cursor: default;
   }
 </style>

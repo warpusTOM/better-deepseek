@@ -347,12 +347,16 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
       if (jsonMatch) {
         let parsedCount = "0";
         let parsedDeepFetch = "0";
+        let parsedProvider = "";
+        let parsedLowConfidence = false;
         let parsedResults = "[]";
         try {
           const data = JSON.parse(jsonMatch[1].trim());
           parsedResults = JSON.stringify(data.results || []);
           parsedCount = String(data.count ?? data.results?.length ?? 0);
           parsedDeepFetch = String(data.deepFetch ?? 0);
+          parsedProvider = String(data.provider || "");
+          parsedLowConfidence = data.lowConfidence === true;
         } catch (e) {
           console.error("[BDS:AUTO_SEARCH_RESULT] Failed to parse JSON:", e);
         }
@@ -364,7 +368,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
           const existing = messageOverlays.get(node);
           const newBlocks = [{
             name: "auto_search_result",
-            attrs: { query, count: parsedCount, deepFetch: parsedDeepFetch },
+            attrs: { query, count: parsedCount, deepFetch: parsedDeepFetch, provider: parsedProvider, lowConfidence: parsedLowConfidence },
             content: parsedResults
           }];
 

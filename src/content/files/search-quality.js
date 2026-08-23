@@ -43,6 +43,13 @@ const SEARCH_PROVIDER_DOMAINS = [
   "search.yahoo.com",
 ];
 
+// Han ideographs (incl. Extension A + compatibility forms). CJK words are
+// usually short (2 chars) and written without spaces, so whole-run tokens
+// alone can't reward partial title matches — character bigrams fix that.
+const CONTAINS_CJK_RE = /[\u3400-\u9FFF\uF900-\uFAFF]/;
+const CJK_RUN_RE = /[\u3400-\u9FFF\uF900-\uFAFF]{2,}/g;
+const MAX_IMPORTANT_TOKENS = 32;
+
 const SOURCE_TYPE_HINTS = {
   general: [],
   docs: ["documentation", "docs", "reference", "api"],
@@ -59,7 +66,7 @@ function cleanText(value) {
 function normalizeToken(value) {
   return String(value || "")
     .toLowerCase()
-    .replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, "");
 }
 
 function tokenize(value) {
@@ -102,6 +109,17 @@ export function normalizeSearchUrl(value) {
   }
 }
 
+function expandCjkBigrams(token) {
+  const bigrams = [];
+  for (const match of token.matchAll(CJK_RUN_RE)) {
+    const run = match[0];
+    for (let i = 0; i + 2 <= run.length; i++) {
+      bigrams.push(run.slice(i, i + 2));
+    }
+  }
+  return bigrams;
+}
+
 export function extractSearchSignals(query) {
   const normalizedQuery = cleanText(query);
   const quotedPhrases = extractMatches(/"([^"]+)"/g, normalizedQuery);
@@ -113,18 +131,34 @@ export function extractSearchSignals(query) {
     normalizeToken
   );
   const years = extractMatches(/\b((?:19|20)\d{2})\b/g, normalizedQuery);
-  const importantTokens = tokenize(
+  const baseTokens = tokenize(
     normalizedQuery
       .replace(/"[^"]+"/g, " ")
       .replace(/(?:^|\s)-site:[^\s]+/gi, " ")
       .replace(/(?:^|\s)site:[^\s]+/gi, " ")
       .replace(/(?:^|\s)-[^\s"]+/g, " ")
-  ).filter((token) => token.length > 2 && !STOP_WORDS.has(token));
+  ).filter(
+    // Latin words need 3+ chars; CJK words are meaningful at 2 chars.
+    (token) =>
+      (token.length > 2 || (CONTAINS_CJK_RE.test(token) && token.length >= 2)) &&
+      !STOP_WORDS.has(token)
+  );
+
+  // Keep whole tokens (exact-phrase matching) and add CJK bigrams so ranking
+  // can reward partial matches inside longer page titles/snippets.
+  const tokensWithBigrams = [...baseTokens];
+  for (const token of baseTokens) {
+    if (CONTAINS_CJK_RE.test(token)) {
+      for (const bigram of expandCjkBigrams(token)) {
+        if (!tokensWithBigrams.includes(bigram)) tokensWithBigrams.push(bigram);
+      }
+    }
+  }
 
   return {
     normalizedQuery,
     quotedPhrases,
-    importantTokens: [...new Set(importantTokens)],
+    importantTokens: [...new Set(tokensWithBigrams)].slice(0, MAX_IMPORTANT_TOKENS),
     years,
     includeSites,
     excludeSites,
@@ -189,8 +223,16 @@ function escapeRegExp(value) {
 function containsTerm(haystack, term) {
   const needle = cleanText(term).toLowerCase();
   if (!needle) return false;
-  if (/^[a-z0-9]+$/.test(needle)) {
-    return new RegExp(`(^|[^a-z0-9])${escapeRegExp(needle)}($|[^a-z0-9])`, "i").test(haystack);
+  // Han script concatenates words without separators, so word-boundary
+  // semantics don't apply — substring matching is the only meaningful mode.
+  if (CONTAINS_CJK_RE.test(needle)) {
+    return haystack.includes(needle);
+  }
+  if (/^[\p{L}\p{N}]+$/u.test(needle)) {
+    return new RegExp(
+      `(^|[^\\p{L}\\p{N}])${escapeRegExp(needle)}($|[^\\p{L}\\p{N}])`,
+      "iu"
+    ).test(haystack);
   }
   return haystack.includes(needle);
 }

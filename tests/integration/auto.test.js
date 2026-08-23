@@ -26,6 +26,7 @@ vi.mock("../../src/content/files/youtube-reader.js", () => ({
 }));
 vi.mock("../../src/content/files/search-reader.js", () => ({
   searchWeb: readerMocks.searchWeb,
+  resolveSearchProviders: (preferred) => preferred || [],
 }));
 
 function setupAutoDom() {
@@ -764,7 +765,12 @@ describe("auto integration", () => {
     const editor = document.querySelector("#chat-input");
     const sendButton = document.querySelector("button");
 
-    expect(readerMocks.searchWeb).toHaveBeenCalledWith("test query", 3, expect.any(Function), {});
+    expect(readerMocks.searchWeb).toHaveBeenCalledWith(
+      "test query",
+      3,
+      expect.any(Function),
+      { providers: ["ddg-lite", "ddg-html", "bing"] }
+    );
     expect(input.files).toHaveLength(1);
     expect(editor.value).toContain("Search Result");
     expect(editor.value).toContain("[BDS:AUTO_SEARCH_RESULT]");
@@ -806,7 +812,7 @@ describe("auto integration", () => {
       "same query",
       0,
       expect.any(Function),
-      { purpose: "overview", sourceType: "general" }
+      expect.objectContaining({ purpose: "overview", sourceType: "general" })
     );
   });
 

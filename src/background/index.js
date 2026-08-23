@@ -452,6 +452,24 @@ async function fetchPageContent(url, options = {}) {
   if (!url) throw new Error("No URL provided.");
   const safeOptions = options && typeof options === "object" ? options : {};
 
+  // Optional hard budget (ms). Uses the same AbortController pattern as
+  // mcpFetch so a hanging host (e.g. a blackholed search provider) fails
+  // fast instead of stalling the caller's provider chain for minutes (#148).
+  const timeoutMs =
+    Number.isFinite(safeOptions.timeoutMs) && Number(safeOptions.timeoutMs) > 0
+      ? Number(safeOptions.timeoutMs)
+      : 0;
+  const ac = timeoutMs > 0 ? new AbortController() : null;
+  const timer = ac
+    ? setTimeout(
+        () =>
+          ac.abort(
+            new DOMException(`Request timed out after ${timeoutMs}ms`, "TimeoutError")
+          ),
+        timeoutMs
+      )
+    : null;
+
   const fetchOptions = {
     method: safeOptions.method || "GET",
     headers: safeOptions.headers || {},
@@ -470,29 +488,44 @@ async function fetchPageContent(url, options = {}) {
   if (safeOptions.redirect) {
     fetchOptions.redirect = safeOptions.redirect;
   }
-
-  const resp = await fetch(url, fetchOptions);
-  if (!resp.ok) {
-    const error = new Error(`Server returned ${resp.status} for ${url}`);
-    error.status = resp.status;
-    throw error;
+  if (ac) {
+    fetchOptions.signal = ac.signal;
   }
 
-  const buffer = await resp.arrayBuffer();
-
-  let charset = detectCharsetFromHeaders(resp);
-  if (!charset) {
-    charset = detectCharsetFromHtml(buffer);
-  }
-
-  let html;
   try {
-    html = new TextDecoder(charset || "utf-8", { fatal: false }).decode(buffer);
-  } catch {
-    html = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
-  }
+    let resp;
+    let buffer;
+    try {
+      resp = await fetch(url, fetchOptions);
+      if (!resp.ok) {
+        const error = new Error(`Server returned ${resp.status} for ${url}`);
+        error.status = resp.status;
+        throw error;
+      }
+      buffer = await resp.arrayBuffer();
+    } catch (err) {
+      if (ac && ac.signal.aborted) {
+        throw new Error(`Request timed out after ${timeoutMs}ms`);
+      }
+      throw err;
+    }
 
-  return { html, status: resp.status };
+    let charset = detectCharsetFromHeaders(resp);
+    if (!charset) {
+      charset = detectCharsetFromHtml(buffer);
+    }
+
+    let html;
+    try {
+      html = new TextDecoder(charset || "utf-8", { fatal: false }).decode(buffer);
+    } catch {
+      html = new TextDecoder("utf-8", { fatal: false }).decode(buffer);
+    }
+
+    return { html, status: resp.status };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 // Open chat.deepseek.com when the extension toolbar icon is clicked

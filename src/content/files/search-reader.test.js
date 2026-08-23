@@ -16,6 +16,8 @@ import {
   formatDeepFetchContent,
   extractUrlFromDdgLink,
   extractUrlFromBingLink,
+  resolveSearchProviders,
+  SEARCH_PROVIDER_CATALOG,
 } from "./search-reader.js";
 
 function readFileAsText(file) {
@@ -217,7 +219,7 @@ describe("formatSearchResults", () => {
     const md = formatSearchResults("test query", results);
 
     expect(md).toContain("# Search Results: test query");
-    expect(md).toContain("> 2 results found via DuckDuckGo");
+    expect(md).toContain("> 2 results found via DuckDuckGo Lite");
     expect(md).toContain("## 1. A");
     expect(md).toContain("> Snippet A");
     expect(md).toContain("**URL:** https://a.com");
@@ -314,6 +316,52 @@ describe("formatDeepFetchContent", () => {
   });
 });
 
+describe("resolveSearchProviders", () => {
+  it("exposes a stable catalog of known providers", () => {
+    expect(SEARCH_PROVIDER_CATALOG).toEqual([
+      { id: "ddg-lite", name: "DuckDuckGo Lite" },
+      { id: "ddg-html", name: "DuckDuckGo HTML" },
+      { id: "bing", name: "Bing" },
+    ]);
+  });
+
+  it("returns the default order when no preference is set", () => {
+    const resolved = resolveSearchProviders(undefined);
+    expect(resolved.map((p) => p.id)).toEqual(["ddg-lite", "ddg-html", "bing"]);
+  });
+
+  it("returns the default order for an empty list (all providers disabled)", () => {
+    expect(resolveSearchProviders([]).map((p) => p.id)).toEqual(["ddg-lite", "ddg-html", "bing"]);
+  });
+
+  it("resolves a custom user order", () => {
+    expect(resolveSearchProviders(["bing", "ddg-html"]).map((p) => p.id)).toEqual([
+      "bing",
+      "ddg-html",
+    ]);
+  });
+
+  it("filters unknown ids and dedupes repeats", () => {
+    expect(
+      resolveSearchProviders(["nope", "bing", "bing", "ddg-lite"]).map((p) => p.id)
+    ).toEqual(["bing", "ddg-lite"]);
+  });
+
+  it("falls back to defaults when every id is unknown", () => {
+    expect(resolveSearchProviders(["ask-jeeves", "alta-vista"]).map((p) => p.id)).toEqual([
+      "ddg-lite",
+      "ddg-html",
+      "bing",
+    ]);
+  });
+
+  it("does not mutate its input array", () => {
+    const input = ["bing"];
+    resolveSearchProviders(input);
+    expect(input).toEqual(["bing"]);
+  });
+});
+
 describe("searchWeb", () => {
   const ON_STATUS = vi.fn();
 
@@ -324,7 +372,7 @@ describe("searchWeb", () => {
 
   it("fetches search results and returns a markdown File with metadata", async () => {
     const html = makeResultHtml([
-      { title: "Result One", url: "https://one.com", snippet: "First snippet" },
+      { title: "Test query results", url: "https://one.com/test-query", snippet: "Everything about the test query." },
     ]);
     chromeSendMessageMock.mockResolvedValue({ ok: true, html });
 
@@ -341,19 +389,23 @@ describe("searchWeb", () => {
     expect(result.file.type).toBe("text/markdown");
     expect(result.query).toBe("test query");
     expect(result.deepFetch).toBe(0);
-    expect(result.provider).toBe("DuckDuckGo");
+    expect(result.provider).toBe("DuckDuckGo Lite");
+    expect(result.lowConfidence).toBe(false);
+    const text = await readFileAsText(result.file);
+    expect(text).not.toContain("Low-confidence results");
     expect(result.effectiveQuery).toBeUndefined();
     expect(result.rawResultCount).toBe(1);
     expect(result.results).toHaveLength(1);
     expect(result.results[0]).toEqual({
-      title: "Result One",
-      url: "https://one.com",
-      snippet: "First snippet",
+      title: "Test query results",
+      url: "https://one.com/test-query",
+      snippet: "Everything about the test query.",
     });
-    const text = await readFileAsText(result.file);
-    expect(text).toContain("# Search Results: test query");
-    expect(text).toContain("## 1. Result One");
-    expect(ON_STATUS).toHaveBeenCalled();
+    expect(ON_STATUS).toHaveBeenCalledWith(
+      "Searching DuckDuckGo Lite...",
+      { phase: "searching", provider: "DuckDuckGo Lite" }
+    );
+    expect(ON_STATUS).toHaveBeenCalledWith("Creating file...", { phase: "finalize" });
   });
 
   it("falls back to Bing when DuckDuckGo returns the Android anomaly page", async () => {
@@ -388,7 +440,33 @@ describe("searchWeb", () => {
       },
     ]);
     expect(text).toContain("> 1 results found via Bing");
-    expect(ON_STATUS).toHaveBeenCalledWith("Searching Bing...");
+    expect(ON_STATUS).toHaveBeenCalledWith("Searching Bing...", { phase: "searching", provider: "Bing" });
+  });
+
+  it("falls back to Bing when DuckDuckGo providers time out", async () => {
+    chromeSendMessageMock
+      .mockResolvedValueOnce({ ok: false, error: "Request timed out after 15000ms" })
+      .mockResolvedValueOnce({ ok: false, error: "Request timed out after 15000ms" })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        html: makeBingResultHtml([
+          {
+            title: "DeepSeek API documentation",
+            url: "https://platform.deepseek.com/api-docs",
+            snippet: "Official API docs and reference for DeepSeek.",
+          },
+        ]),
+      });
+
+    const result = await searchWeb("DeepSeek API docs", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(3);
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
+    expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("html.duckduckgo.com");
+    expect(chromeSendMessageMock.mock.calls[2][0].url).toContain("www.bing.com/search");
+    expect(result.provider).toBe("Bing");
+    expect(result.results[0].url).toBe("https://platform.deepseek.com/api-docs");
   });
 
   it("adds purpose and sourceType query shaping only when metadata is provided", async () => {
@@ -514,8 +592,33 @@ describe("searchWeb", () => {
       sourceType: "reviews",
     });
 
-    expect(result.provider).toBe("DuckDuckGo");
+    expect(result.provider).toBe("DuckDuckGo Lite");
     expect(result.results[0].title).toBe("Laptop reviews 2025 shortlist");
+    expect(result.lowConfidence).toBe(false);
+  });
+
+  it("marks results low-confidence when only weak matches could be recovered", async () => {
+    const unrelated = (host) => ({
+      ok: true,
+      status: 200,
+      html: makeResultHtml([
+        { title: "Unrelated page", url: `https://${host}/x`, snippet: "Nothing relevant here." },
+      ]),
+    });
+    chromeSendMessageMock
+      .mockResolvedValueOnce(unrelated("a.com"))
+      .mockResolvedValueOnce(unrelated("b.com"))
+      .mockResolvedValueOnce(unrelated("c.com"));
+
+    const result = await searchWeb("zzqxjv", 0, ON_STATUS);
+
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(3);
+    expect(result.provider).toBe("DuckDuckGo Lite");
+    expect(result.results).toHaveLength(1);
+    expect(result.lowConfidence).toBe(true);
+    const text = await readFileAsText(result.file);
+    expect(text).toContain("Low-confidence results");
+    expect(text.indexOf("Low-confidence results")).toBeLessThan(text.indexOf("# Search Results:"));
   });
 
   it("deepFetch reads top N pages", async () => {
@@ -635,6 +738,7 @@ describe("searchWeb", () => {
     expect(sentMessage.options.cache).toBe("no-store");
     expect(sentMessage.options.credentials).toBe("omit");
     expect(sentMessage.options.redirect).toBe("follow");
+    expect(sentMessage.options.timeoutMs).toBe(15000);
   });
 
   it("uses DuckDuckGo HTML when Lite returns challenge", async () => {
@@ -655,7 +759,7 @@ describe("searchWeb", () => {
     expect(chromeSendMessageMock).toHaveBeenCalledTimes(2);
     expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
     expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("html.duckduckgo.com");
-    expect(result.provider).toBe("DuckDuckGo");
+    expect(result.provider).toBe("DuckDuckGo HTML");
     expect(result.results[0].url).toBe("https://html-result.com/one");
   });
 
@@ -680,7 +784,7 @@ describe("searchWeb", () => {
     expect(result.provider).toBe("Bing");
   });
 
-  it("uses Bing first when query has positive site: constraint", async () => {
+  it("searches site: queries with the user-configured provider order", async () => {
     chromeSendMessageMock
       .mockResolvedValueOnce({
         ok: true,
@@ -692,7 +796,12 @@ describe("searchWeb", () => {
         ]),
       });
 
-    const result = await searchWeb("site:api-docs.deepseek.com chat completions DeepSeek API", 0, ON_STATUS);
+    const result = await searchWeb(
+      "site:api-docs.deepseek.com chat completions DeepSeek API",
+      0,
+      ON_STATUS,
+      { providers: ["bing"] }
+    );
 
     expect(chromeSendMessageMock).toHaveBeenCalledTimes(1);
     expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("www.bing.com/search");
@@ -700,25 +809,29 @@ describe("searchWeb", () => {
     expect(result.results[0].url).toContain("api-docs.deepseek.com");
   });
 
-  it("falls back to DuckDuckGo when Bing fails for site: query", async () => {
+  it("keeps the default provider order for site: queries when no preference is set", async () => {
     chromeSendMessageMock
-      .mockResolvedValueOnce({ ok: true, status: 202, html: makeDdgChallengeHtml() })
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        html: makeDdgHtmlResultHtml([
-          { title: "GitHub issue", url: "https://github.com/EdgeTypE/better-deepseek/issues/81", snippet: "GitHub issue 81 details for EdgeTypE better-deepseek" },
+        html: makeResultHtml([
+          {
+            title: "EdgeTypE/better-deepseek issue tracker 2025",
+            url: "https://github.com/EdgeTypE/better-deepseek/issues",
+            snippet: "Issue tracker for better-deepseek, active in 2025.",
+          },
         ]),
-      })
-      .mockResolvedValueOnce({ ok: true, status: 200, html: "<html><body>no results</body></html>" });
+      });
 
-    const result = await searchWeb("site:github.com EdgeTypE better-deepseek issue 81", 0, ON_STATUS);
+    const result = await searchWeb(
+      "site:github.com better-deepseek issue tracker 2025",
+      0,
+      ON_STATUS
+    );
 
-    expect(chromeSendMessageMock).toHaveBeenCalledTimes(3);
-    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("www.bing.com/search");
-    expect(chromeSendMessageMock.mock.calls[1][0].url).toContain("lite.duckduckgo.com");
-    expect(chromeSendMessageMock.mock.calls[2][0].url).toContain("html.duckduckgo.com");
-    expect(result.provider).toBe("DuckDuckGo");
+    expect(chromeSendMessageMock).toHaveBeenCalledTimes(1);
+    expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
+    expect(result.provider).toBe("DuckDuckGo Lite");
     expect(result.results[0].url).toContain("github.com");
   });
 
@@ -739,6 +852,6 @@ describe("searchWeb", () => {
     const result = await searchWeb("general query without site constraint", 0, ON_STATUS);
 
     expect(chromeSendMessageMock.mock.calls[0][0].url).toContain("lite.duckduckgo.com");
-    expect(result.provider).toBe("DuckDuckGo");
+    expect(result.provider).toBe("DuckDuckGo Lite");
   });
 });

@@ -20,6 +20,7 @@ vi.mock("../../src/content/files/search-reader.js", () => ({
     file: new File(["test"], "search.md", { type: "text/plain" }),
     provider: "mock",
   }),
+  resolveSearchProviders: (preferred) => preferred || [],
 }));
 
 vi.mock("../../src/content/files/web-reader.js", () => ({

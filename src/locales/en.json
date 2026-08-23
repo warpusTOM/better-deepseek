@@ -129,6 +129,15 @@
       "contextGuardLimitHint": "DeepSeek web-chat context window size. Default 128,000 tokens.",
       "contextGuardStopPercent": "Stop Threshold (%)",
       "contextGuardStopPercentHint": "Stop Deep Research when estimated context reaches {{threshold}} tokens. Clamped to 50-95%.",
+      "searchProviders": "Search Providers",
+      "searchProvidersHint": "Choose and order the engines used by automatic web search. The first engine that returns strong results wins.",
+      "providerMoveUp": "Move provider up",
+      "providerMoveDown": "Move provider down",
+      "searchProvider": {
+        "ddgLite": "DuckDuckGo (Lite)",
+        "ddgHtml": "DuckDuckGo (HTML)",
+        "bing": "Bing"
+      },
       "collapseLongUserMessages": "Collapse long user messages",
       "collapseLongUserMessagesHint": "Automatically hide very long user messages behind a read-more toggle.",
       "loadAllHistoryOnSession": "Load all history when opening a session",
@@ -439,9 +448,10 @@
       "showOutput": "Show Output ▾"
     },
     "searchResult": {
-      "searching": "Searching DuckDuckGo...",
       "resultsFor": "Search Results: {{query}}",
-      "resultCount": "{{count}} results found"
+      "resultCount": "{{count}} results found",
+      "via": "via {{provider}}",
+      "lowConfidence": "Low-confidence results — verify before citing"
     },
     "fileReadResult": {
       "success": "File Read Successfully",
@@ -745,7 +755,7 @@
       "skillActive": "Active skill: <strong>{{name}}</strong>",
       "webFetchRequested": "Web page is being fetched",
       "githubFetchRequested": "GitHub repository is being fetched",
-      "searchRequested": "Searching DuckDuckGo...",
+      "searchRequested": "Searching {{provider}}...",
       "fileReadRequested": "Reading codebase file...",
       "directorySearchRequested": "Searching codebase...",
       "directoryListRequested": "Listing directory...",

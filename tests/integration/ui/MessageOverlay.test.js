@@ -34,6 +34,39 @@ describe("MessageOverlay integration", () => {
     cleanup();
   });
 
+  it("renders search request card with provider name and live-updates on search-status events", async () => {
+    const results = [
+      { title: "Result One", url: "https://one.com", snippet: "First snippet" },
+    ];
+    const { target, cleanup } = renderSvelte(MessageOverlay, {
+      text: "",
+      blocks: [
+        { name: "auto:search", content: "deepseek api docs", attrs: {} },
+        {
+          name: "auto_search_result",
+          content: JSON.stringify(results),
+          attrs: { query: "deepseek api docs", count: "1", deepFetch: "0", provider: "Bing", lowConfidence: true },
+        },
+      ],
+      loading: false,
+      loadingIndex: -1,
+    });
+    await flushUi();
+
+    expect(target.textContent).toContain("Searching DuckDuckGo Lite...");
+    expect(target.textContent).toContain("Search Results: deepseek api docs");
+    expect(target.textContent).toContain("1 results found");
+    expect(target.textContent).toContain("via Bing");
+    expect(target.textContent).toContain("Low-confidence results");
+
+    window.dispatchEvent(new CustomEvent("bds:search-status", {
+      detail: { query: "deepseek api docs", provider: "Bing", phase: "searching" },
+    }));
+    await flushUi();
+    expect(target.textContent).toContain("Searching Bing...");
+    cleanup();
+  });
+
   it("shows answers when bds-questions-answered event fires", async () => {
     const questions = [
       { id: "q1", question: "Pick one", type: "test", options: ["A", "B"] }

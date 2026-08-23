@@ -9,6 +9,7 @@ const readerMocks = vi.hoisted(() => ({
 
 vi.mock("../../src/content/files/search-reader.js", () => ({
   searchWeb: readerMocks.searchWeb,
+  resolveSearchProviders: (preferred) => preferred || [],
 }));
 
 vi.mock("../../src/content/files/web-reader.js", () => ({

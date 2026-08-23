@@ -123,6 +123,15 @@
       "contextGuardLimitHint": "DeepSeek web sohbeti bağlam penceresi boyutu. Varsayılan 128.000 token.",
       "contextGuardStopPercent": "Durdurma Eşiği (%)",
       "contextGuardStopPercentHint": "Tahmini bağlam {{threshold}} tokene ulaştığında Deep Research'ü durdurur. 50-95% aralığıyla sınırlandırılır.",
+      "searchProviders": "Arama Sağlayıcıları",
+      "searchProvidersHint": "Otomatik web aramasında kullanılacak motorları seçin ve sıralayın. Güçlü sonuç döndüren ilk motor kullanılır.",
+      "providerMoveUp": "Sağlayıcıyı yukarı taşı",
+      "providerMoveDown": "Sağlayıcıyı aşağı taşı",
+      "searchProvider": {
+        "ddgLite": "DuckDuckGo (Lite)",
+        "ddgHtml": "DuckDuckGo (HTML)",
+        "bing": "Bing"
+      },
       "enabled": "Etkin",
       "githubTokenHelp": "GitHub Ayarları -> Tokens altından repo yetkili klasik bir token oluşturun.",
       "githubTokenShow": "Göster",
@@ -436,9 +445,10 @@
       "showOutput": "Çıktıyı Göster ▾"
     },
     "searchResult": {
-      "searching": "DuckDuckGo aranıyor...",
       "resultsFor": "Arama Sonuçları: {{query}}",
-      "resultCount": "{{count}} sonuç bulundu"
+      "resultCount": "{{count}} sonuç bulundu",
+      "via": "{{provider}} üzerinden",
+      "lowConfidence": "Düşük güvenilirlikte sonuçlar — kaynak göstermeden önce doğrulayın"
     },
     "fileReadResult": {
       "success": "Dosya Başarıyla Okundu",
@@ -742,7 +752,7 @@
       "skillActive": "Aktif yetenek: <strong>{{name}}</strong>",
       "webFetchRequested": "Web sayfası getiriliyor",
       "githubFetchRequested": "GitHub deposu getiriliyor",
-      "searchRequested": "DuckDuckGo aranıyor...",
+      "searchRequested": "{{provider}} aranıyor...",
       "fileReadRequested": "Kod dosyası okunuyor...",
       "directorySearchRequested": "Kod tabanında aranıyor...",
       "directoryListRequested": "Dizin listeleniyor...",

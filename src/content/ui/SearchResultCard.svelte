@@ -1,7 +1,7 @@
 <script>
   import { t } from "../../lib/i18n.svelte.js";
 
-  let { query = "", count = "0", results = "[]" } = $props();
+  let { query = "", count = "0", results = "[]", provider = "", lowConfidence = false } = $props();
 
   let parsedResults = $derived.by(() => {
     try {
@@ -41,7 +41,12 @@
         </div>
         <div class="bds-search-details">
           <h4>{t('searchResult.resultsFor', { query })}</h4>
-          <p>{t('searchResult.resultCount', { count: resultCount })}</p>
+          <p>
+            {t('searchResult.resultCount', { count: resultCount })}{#if provider} · {t('searchResult.via', { provider })}{/if}
+          </p>
+          {#if lowConfidence}
+            <p class="bds-search-low-confidence">⚠️ {t('searchResult.lowConfidence')}</p>
+          {/if}
         </div>
       </div>
     </div>
@@ -249,5 +254,12 @@
 
   .bds-search-url:hover {
     opacity: 0.8;
+  }
+
+  .bds-search-low-confidence {
+    margin: 4px 0 0;
+    font-size: 11px;
+    line-height: 1.35;
+    color: var(--bds-warning, #d97706);
   }
 </style>

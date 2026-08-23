@@ -28,6 +28,7 @@
   import { t } from "../../lib/i18n.svelte.js";
   import { parseLooseJson } from "../parser/json-repair.js";
   import { triggerTextDownload } from "../../lib/utils/download.js";
+  import { resolveSearchProviders } from "../files/search-reader.js";
 
 
   /** 
@@ -47,6 +48,37 @@
   let answeredData = $state(null);
   let outerOpen = $state(false);
   let innerOpen = $state({});
+  let liveSearchProviders = $state({});
+
+  function normalizeSearchQueryKey(value) {
+    return String(value || "").replace(/\s+/g, " ").trim();
+  }
+
+  function primarySearchProviderName() {
+    try {
+      return resolveSearchProviders(appState.settings?.searchProviders)[0]?.name || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function searchRequestProviderLabel(query) {
+    return liveSearchProviders[normalizeSearchQueryKey(query)] || primarySearchProviderName();
+  }
+
+  $effect(() => {
+    const handler = (e) => {
+      const detail = e.detail || {};
+      if (detail.phase !== "searching" || !detail.provider) return;
+      const key = normalizeSearchQueryKey(detail.query);
+      if (!key) return;
+      if (liveSearchProviders[key] !== detail.provider) {
+        liveSearchProviders = { ...liveSearchProviders, [key]: detail.provider };
+      }
+    };
+    window.addEventListener('bds:search-status', handler);
+    return () => window.removeEventListener('bds:search-status', handler);
+  });
 
   let parsed = $derived.by(() => {
     const qBlock = blocks.find(b => b.name === 'ask_question');
@@ -376,12 +408,12 @@
             </svg>
           </div>
           <div class="bds-question-content">
-            <div class="bds-question-title">{t('messageOverlay.searchRequested')}</div>
+            <div class="bds-question-title">{t('messageOverlay.searchRequested', { provider: searchRequestProviderLabel(block.content) })}</div>
             <div class="bds-question-subtitle">{block.content}</div>
           </div>
         </div>
       {:else if block.name === 'auto_search_result'}
-        <SearchResultCard query={block.attrs.query} count={block.attrs.count} results={block.content} />
+        <SearchResultCard query={block.attrs.query} count={block.attrs.count} provider={block.attrs.provider} lowConfidence={block.attrs.lowConfidence} results={block.content} />
       {:else if block.name === 'auto:file_read'}
         <div class="bds-question-info-card bds-file-read-card">
           <div class="bds-question-icon bds-file-read-icon">

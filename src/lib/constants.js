@@ -259,7 +259,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
   "- <BDS:AUTO:SEARCH purpose=\"confirm release notes\" sourceType=\"docs\">Python 3.13 release notes PEP 719</BDS:AUTO:SEARCH>",
   "",
   "OUTPUT BEHAVIOR:",
-  "- The extension searches DuckDuckGo and injects results as a markdown file.",
+  "- The extension searches the web and injects results as a markdown file.",
   "- After injection, you receive the search results as context in a follow-up message.",
   "- Read the search results carefully and provide a grounded answer with source citations.",
   "- If deepFetch was used, full page content is also provided for accuracy.",
@@ -844,6 +844,8 @@ export const DEFAULT_SETTINGS = {
   deepResearchDeepFetch: 1,
   // MCP inline content max chars — tool lists & results truncated to this when inline
   mcpInlineMaxChars: 8000,
+  // Ordered, enabled web-search providers (see resolveSearchProviders in search-reader.js)
+  searchProviders: ["ddg-lite", "ddg-html", "bing"],
   // Load all history — scroll to top on session open to trigger lazy-load
   loadAllHistoryOnSession: false,
   showTimestamps: false,

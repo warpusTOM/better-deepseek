@@ -17,6 +17,7 @@ const readerMocks = vi.hoisted(() => ({
 
 vi.mock("../../src/content/files/search-reader.js", () => ({
   searchWeb: readerMocks.searchWeb,
+  resolveSearchProviders: (preferred) => preferred || [],
 }));
 
 vi.mock("../../src/content/files/web-reader.js", () => ({
@@ -128,7 +129,7 @@ describe("Deep Research runtime events", () => {
       "gaming laptop reviews",
       3,
       expect.any(Function),
-      { purpose: "collect review evidence", sourceType: "reviews" },
+      expect.objectContaining({ purpose: "collect review evidence", sourceType: "reviews" }),
     );
     const evidenceCall = autoMocks.sendFileWithMessage.mock.calls.find((call) => call[0] === evidenceFile);
     expect(evidenceCall).toBeTruthy();
