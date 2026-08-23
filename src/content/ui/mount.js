@@ -17,6 +17,7 @@ import state from "../state.js";
  * @property {() => void} refreshProjects
  * @property {(title: string, content: string) => void} showPreviewPanel
  * @property {() => void} hidePreviewPanel
+ * @property {(visible: boolean) => void} showLongWorkOverlay
  */
 
 /**
@@ -54,6 +55,7 @@ export function mountUi() {
     refreshCssSnippets: () => app.refreshCssSnippets(),
     showPreviewPanel: (title, content) => app.showPreviewPanel(title, content),
     hidePreviewPanel: () => app.hidePreviewPanel(),
+    showLongWorkOverlay: (visible) => app.showLongWorkOverlay(visible),
   };
 
   state.ui = api;
