@@ -30,6 +30,12 @@
     "type": "info"
   },
   {
+    "id": "deepseek-update-breaks-bds-urgent-fix-v1",
+    "show": true,
+    "message": "An update released today by DeepSeek has broken Better DeepSeek, whether intentionally or unintentionally. We have released an urgent fix. It may take up to 24 hours for the update to be reviewed and published by the extension stores. Thank you for your understanding. -BDS",
+    "type": "warning"
+  },
+  {
     "id": "deepseek-ui-update-issue-v1",
     "show": true,
     "message": "Due to a recent update to the DeepSeek interface, some extension features may currently not be working properly. We are aware of the issue and actively working on a fix. For more details or if you would like to help resolve it, please check our GitHub repository. -BDS",

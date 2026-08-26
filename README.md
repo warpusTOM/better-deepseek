@@ -360,6 +360,10 @@ Better DeepSeek does not collect, transmit, or sell any personal data. All setti
 
 ## Changelog
 
+### v0.1.13 (2026-08-26)
+- **Critical Hotfix**: Resolved an issue caused by a recent DeepSeek update that broke the extension. Core extension functionality has been restored. We are monitoring the situation closely and follow-up hotfixes will be issued for any minor remaining issues.
+- **New Feature**: Search Provider List. Users can now choose, reorder, and prioritize automatic search providers (Bing and DuckDuckGo) in settings.
+
 ### v0.1.12 (2026-08-15)
 - **New Feature**: DeepCode (Experimental). A collaborative coding mode that works alongside DeepSeek Harness. Enable DeepCode to plan tasks and execute multi-step code workflows with AI, then seamlessly transfer the plan to DeepSeek Harness. For full integration, install the [dsh-better-deepseek](https://github.com/EdgeTypE/dsh-better-deepseek) plugin in DeepSeek Harness.
 - **New Feature**: DeepCode Auto Tools. Added three new BDS auto tools: `<BDS:AUTO:SEARCH_IN_DIRECTORY>`, `<BDS:AUTO:LIST_DIR>`, and `<BDS:AUTO:FILE_READ>` (active when DeepCode mode is enabled) for codebase exploration.

@@ -941,6 +941,19 @@
       "seeAllChanges": "在 GitHub 上查看 v{{version}} 的全部变更",
       "seeDetailed": "在 GitHub 上查看详细发布说明",
       "features": {
+        "v0_1_13": {
+          "title": "紧急热修复 1",
+          "features": {
+            "feat_0": {
+              "title": "崩溃修复",
+              "description": "DeepSeek 近期的更新导致扩展异常崩溃。我们紧急发布了修复补丁以恢复关键功能。我们正在密切跟进，后续将按需发布进一步的优化热修。"
+            },
+            "feat_1": {
+              "title": "搜索引擎列表",
+              "description": "现在可以在设置中按需自定义、排序和优先使用搜索引擎（Bing 与 DuckDuckGo）。"
+            }
+          }
+        },
         "v0_1_12": {
           "title": "DeepCode、消息队列与稳定性",
           "features": {

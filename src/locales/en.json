@@ -945,6 +945,19 @@
       "seeAllChanges": "See all changes in v{{version}} on GitHub",
       "seeDetailed": "See detailed release notes on GitHub",
       "features": {
+        "v0_1_13": {
+          "title": "Emergency Hotfix 1",
+          "features": {
+            "feat_0": {
+              "title": "Crash Fix",
+              "description": "A recent DeepSeek update caused the extension to break. We have prepared an emergency fix to restore critical extension functionality. We are closely monitoring the situation and will release further hotfixes if needed."
+            },
+            "feat_1": {
+              "title": "Search Provider List",
+              "description": "Configure and prioritize your preferred search engines (Bing, DuckDuckGo Lite, DuckDuckGo HTML) directly in settings."
+            }
+          }
+        },
         "v0_1_12": {
           "title": "DeepCode, Queued Prompts & Stability",
           "features": {

@@ -942,6 +942,19 @@
       "seeAllChanges": "v{{version}} sürümündeki tüm değişiklikleri GitHub'da gör",
       "seeDetailed": "Detaylı sürüm notlarını GitHub'da gör",
       "features": {
+        "v0_1_13": {
+          "title": "Acil Hotfix 1",
+          "features": {
+            "feat_0": {
+              "title": "Çökme Düzeltmesi",
+              "description": "DeepSeek tarafında yapılan bir güncelleme, eklentinin çökmesine yol açıyordu. Hızlıca bir düzeltme hazırladık. Bazı küçük hatalar olabilir. Yakından takip ediyoruz, onlar için de bir hotfix hazırlayacağız. İlk önceliğimiz eklentinin önemli işlevlerini geri kazanması."
+            },
+            "feat_1": {
+              "title": "Search Provider List",
+              "description": "Artık kullanıcılar, Bing ve DuckDuckGo'yu istediği sırayla ve öncelikle kullanabilirler."
+            }
+          }
+        },
         "v0_1_12": {
           "title": "DeepCode, Mesaj Kuyruğu ve Kararlılık",
           "features": {

@@ -1,5 +1,22 @@
 export const VERSION_HISTORY = [
   {
+    version: "0.1.13",
+    date: "2026-08-26",
+    title: "Emergency Hotfix 1",
+    features: [
+      {
+        type: "bugfix",
+        title: "Crash Fix",
+        description: "A recent DeepSeek update caused the extension to break. We have prepared an emergency fix to restore critical extension functionality. We are closely monitoring the situation and will release further hotfixes if needed."
+      },
+      {
+        type: "feature",
+        title: "Search Provider List",
+        description: "Configure and prioritize your preferred search engines (Bing, DuckDuckGo Lite, DuckDuckGo HTML) directly in settings."
+      }
+    ]
+  },
+  {
     version: "0.1.12",
     date: "2026-08-15",
     title: "DeepCode, Queued Prompts & Stability",
