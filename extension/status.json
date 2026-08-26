@@ -25,8 +25,14 @@
   },
   {
     "id": "deepseek-v4-pro-released-v1",
-    "show": true,
+    "show": false,
     "message": "DeepSeek V4 Pro has been released! You can now try it in Expert mode. Upgraded V4 models are now active on the web interface.",
     "type": "info"
+  },
+  {
+    "id": "deepseek-ui-update-issue-v1",
+    "show": true,
+    "message": "Due to a recent update to the DeepSeek interface, some extension features may currently not be working properly. We are aware of the issue and actively working on a fix. For more details or if you would like to help resolve it, please check our GitHub repository. -BDS",
+    "type": "warning"
   }
 ]
