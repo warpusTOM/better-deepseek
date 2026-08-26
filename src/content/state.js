@@ -108,6 +108,12 @@ const state = {
   remoteConfig: DEFAULT_REMOTE_CONFIG,
 };
 
+export const CHAT_OBSERVER_OPTIONS = {
+  subtree: true,
+  childList: true,
+  characterData: true,
+};
+
 /**
  * Run `fn` with the chat-DOM MutationObserver paused, so DOM mutations the
  * extension itself causes (mounting Svelte components, replaceWith ops) do
@@ -121,7 +127,7 @@ export function withObserverPaused(fn) {
     return fn();
   } finally {
     if (observer && document.body) {
-      observer.observe(document.body, { subtree: true, childList: true });
+      observer.observe(document.body, CHAT_OBSERVER_OPTIONS);
     }
   }
 }

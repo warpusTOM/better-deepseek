@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it, beforeEach } from "vitest";
-import { cleanBdsString, hideBdsTagsInPopovers } from "./tag-hider.js";
+import { cleanBdsString, hideBdsTagsInPopovers, hideTagsInSidebar } from "./tag-hider.js";
 
 describe("tag-hider cleanBdsString", () => {
   it("strips closed BetterDeepSeek tags (raw & encoded)", () => {
@@ -65,5 +65,77 @@ describe("tag-hider hideBdsTagsInPopovers", () => {
 
     expect(document.querySelector("#bds-root ._72b6158").textContent).toBe("<BetterDeepSeek> internal");
     expect(document.querySelector(".ds-markdown").textContent).toBe("<BetterDeepSeek> main message");
+  });
+});
+
+describe("tag-hider hideTagsInSidebar", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("strips tag suffix and stores full title", () => {
+    document.body.innerHTML = `
+      <a href="/chat/s/12345">
+        <span class="c08e6e93">My Project &lt;coding&gt;</span>
+      </a>
+    `;
+
+    hideTagsInSidebar();
+
+    const titleEl = document.querySelector(".c08e6e93");
+    expect(titleEl.textContent).toBe("My Project");
+    expect(titleEl.getAttribute("data-bds-full-title")).toBe("My Project <coding>");
+  });
+
+  it("is idempotent on repeated scans", () => {
+    document.body.innerHTML = `
+      <a href="/chat/s/12345">
+        <span class="c08e6e93">My Project &lt;coding&gt;</span>
+      </a>
+    `;
+
+    hideTagsInSidebar();
+    hideTagsInSidebar();
+
+    const titleEl = document.querySelector(".c08e6e93");
+    expect(titleEl.textContent).toBe("My Project");
+    expect(titleEl.getAttribute("data-bds-full-title")).toBe("My Project <coding>");
+  });
+
+  it("preserves legitimate chat renames without stomping", () => {
+    document.body.innerHTML = `
+      <a href="/chat/s/12345">
+        <span class="c08e6e93">Old Topic &lt;coding&gt;</span>
+      </a>
+    `;
+
+    hideTagsInSidebar();
+    const titleEl = document.querySelector(".c08e6e93");
+    expect(titleEl.textContent).toBe("Old Topic");
+
+    // User or DeepSeek renames chat to "Renamed Topic"
+    titleEl.textContent = "Renamed Topic";
+
+    hideTagsInSidebar();
+    expect(titleEl.textContent).toBe("Renamed Topic");
+    expect(titleEl.hasAttribute("data-bds-full-title")).toBe(false);
+  });
+
+  it("updates correctly when renamed to a new tagged title", () => {
+    document.body.innerHTML = `
+      <a href="/chat/s/12345">
+        <span class="c08e6e93">Old Topic &lt;coding&gt;</span>
+      </a>
+    `;
+
+    hideTagsInSidebar();
+    const titleEl = document.querySelector(".c08e6e93");
+
+    // Renamed to a new tagged title
+    titleEl.textContent = "Brand New <design>";
+
+    hideTagsInSidebar();
+    expect(titleEl.textContent).toBe("Brand New");
+    expect(titleEl.getAttribute("data-bds-full-title")).toBe("Brand New <design>");
   });
 });

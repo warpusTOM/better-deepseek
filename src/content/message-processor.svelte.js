@@ -2,7 +2,7 @@
  * Process individual chat message nodes — detect tools, files, memory writes.
  */
 
-import state from "./state.js";
+import state, { withObserverPaused } from "./state.js";
 import { simpleHash } from "../lib/utils/hash.js";
 import {
   detectMessageRole,
@@ -35,6 +35,16 @@ import {
 import { handleAutoWebFetch, handleAutoGitHubFetch, handleAutoTwitterFetch, handleAutoYouTubeFetch, handleAutoSearch, handleAutoSearchForRun, handleAutoMcpCall, handleAutoFileRead, handleAutoSearchInDirectory, handleAutoListDir, findChatEditor } from "./auto.js";
 import { handleManagedAutoContinuation, isManagedRunActive, trySynthesizeReport } from "./deep-research.js";
 
+import {
+  safeAppendChild,
+  safeInsertBefore,
+  safeRemove,
+  safeSetTextContent,
+  safeAddClass,
+  safeRemoveClass,
+  safeSetAttribute,
+  safeRemoveAttribute,
+} from "./dom/dom-safety.js";
 import { mount, unmount } from "svelte";
 import MessageOverlay from "./ui/MessageOverlay.svelte";
 import { i18n } from "../lib/i18n.svelte.js";
@@ -915,7 +925,7 @@ export function processMessageNode(node, nodeIndex = -1, nodes = null, context =
         ? Array.from(state.longWork.files.entries()).map(([path, content]) => ({ path, content }))
         : parsed.createFiles.map(f => ({ path: f.fileName, content: f.content }));
 
-      const fileHost = node.nextElementSibling?.querySelector('.bds-file-host');
+      const fileHost = node.querySelector('.bds-file-host');
       const isMounted = fileHost && fileHost.querySelector('.bds-download-card');
       
       const needsEmit = !stateData.longWorkClosed || 
@@ -1114,7 +1124,14 @@ function hasDeepResearchEvents(parsed) {
  * visually matches the surrounding message text.
  */
 function matchNativeStyles(node, host) {
-  const md = node.querySelector('.ds-markdown, [class*="markdown"]');
+  const allMd = node.querySelectorAll('.ds-markdown, [class*="markdown"]');
+  let md = null;
+  for (const el of allMd) {
+    if (!el.closest('.bds-host-wrapper') && !el.closest('#bds-root')) {
+      md = el;
+      break;
+    }
+  }
   if (!md) return;
   const cs = getComputedStyle(md);
   host.style.fontFamily = cs.fontFamily;
@@ -1340,8 +1357,8 @@ function applyRtlToNative(node, isRtl) {
   const allMarkdown = node.querySelectorAll('.ds-markdown, [class*="markdown"]');
   
   for (const target of allMarkdown) {
-    // Skip cursor elements
-    if (target.closest('.ds-cursor')) continue;
+    // Skip cursor elements and BDS containers
+    if (target.closest('.ds-cursor') || target.closest('.bds-host-wrapper') || target.closest('#bds-root')) continue;
     
     target.setAttribute('dir', 'rtl');
     target.style.direction = 'rtl';
@@ -1392,6 +1409,10 @@ function hideMessageNode(node, hidden) {
   for (const selector of contentSelectors) {
     const elements = node.querySelectorAll(selector);
     elements.forEach(el => {
+      // NEVER touch elements that belong to BDS overlays or hosts
+      if (el.closest('.bds-host-wrapper') || el.closest('#bds-root') || el.closest('.bds-message-overlay')) {
+        return;
+      }
       // Ignore components that are inside think segments
       if (!el.closest('.ds-think-content') && !el.closest('div[class*="think"]')) {
         foundElements.push(el);
@@ -1400,8 +1421,6 @@ function hideMessageNode(node, hidden) {
   }
 
   if (foundElements.length === 0) {
-    // Fallback: If no content container found yet, hide the whole node
-    toggleNodeHidden(node, hidden);
     return;
   }
 
@@ -1424,34 +1443,68 @@ function toggleNodeHidden(el, hidden) {
 /**
  * Strip <BetterDeepSeek>...</BetterDeepSeek> blocks from user message DOM.
  * Operates on the actual DOM text so the user never sees the injected system prompt.
+ * Uses non-destructive in-place TextNode updates so React reconciler node references remain intact.
  */
 function stripBdsTagsFromUserMessage(node) {
   if (userMsgCleaned.has(node)) return;
 
   // Find the text container inside the user message bubble
-  const textContainer = node.querySelector('.fbb737a4') || node.querySelector('.ds-markdown');
+  const textContainer =
+    node.querySelector(".fbb737a4") ||
+    node.querySelector(".ds-markdown") ||
+    node.querySelector(".ds-collapsible-text") ||
+    node;
   if (!textContainer) return;
 
-  // Use textContent for detection — innerHTML has HTML-encoded angle brackets (&lt; &gt;)
-  const plainText = textContainer.textContent || '';
+  // Use textContent for detection
+  const plainText = textContainer.textContent || "";
   if (!/BetterDeepSeek|BDS:/i.test(plainText)) return;
 
   // Mark as processed before modifying to prevent re-entry
   userMsgCleaned.add(node);
 
-  // innerHTML has &lt;BetterDeepSeek&gt; (HTML-encoded) or raw form, so match with cleanBdsString
-  const html = textContainer.innerHTML;
-  const cleanedText = cleanBdsString(html);
+  // Collect all text nodes inside textContainer
+  const textNodes = [];
+  const walk = document.createTreeWalker(textContainer, NodeFilter.SHOW_TEXT, null, false);
+  while (walk.nextNode()) {
+    textNodes.push(walk.currentNode);
+  }
 
-  if (cleanedText) {
-    // Avoid direct innerHTML assignment to satisfy security linters.
-    // We use a temporary parser to reconstruct the sanitized nodes.
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(cleanedText, 'text/html');
-    textContainer.replaceChildren(...doc.body.childNodes);
-  } else {
-    // If the entire message was the system prompt, hide the whole bubble
-    node.style.display = 'none';
+  if (textNodes.length === 0) {
+    const cleaned = cleanBdsString(plainText);
+    if (cleaned) {
+      safeSetTextContent(textContainer, cleaned);
+    } else {
+      toggleNodeHidden(node, true);
+    }
+    return;
+  }
+
+  // First attempt: clean each TextNode individually to preserve DOM and paragraph structure
+  withObserverPaused(() => {
+    for (const tNode of textNodes) {
+      if (/BetterDeepSeek|BDS:/i.test(tNode.nodeValue || "")) {
+        tNode.nodeValue = cleanBdsString(tNode.nodeValue || "");
+      }
+    }
+  });
+
+  // If tags spanned across text node boundaries, fall back to combined cleaning
+  const remainingText = textContainer.textContent || "";
+  if (/BetterDeepSeek|BDS:/i.test(remainingText)) {
+    const fullText = textNodes.map((t) => t.nodeValue || "").join("");
+    const cleanedText = cleanBdsString(fullText);
+    withObserverPaused(() => {
+      textNodes[0].nodeValue = cleanedText;
+      for (let i = 1; i < textNodes.length; i++) {
+        textNodes[i].nodeValue = "";
+      }
+    });
+  }
+
+  // If the entire message was the system prompt (now empty), safely hide the whole bubble
+  if (!(textContainer.textContent || "").trim()) {
+    toggleNodeHidden(node, true);
   }
 }
 
@@ -1744,7 +1797,7 @@ function injectSelectionCheckbox(node) {
   let id = node.getAttribute("data-bds-msg-id");
   if (!id) {
     id = "msg-" + Math.random().toString(36).substring(2, 11);
-    node.setAttribute("data-bds-msg-id", id);
+    safeSetAttribute(node, "data-bds-msg-id", id);
   }
   checkbox.setAttribute("data-bds-message-id", id);
 
@@ -1759,12 +1812,8 @@ function injectSelectionCheckbox(node) {
 
   container.appendChild(checkbox);
   
-  // Inser at the very beginning of the message node
-  if (node.firstChild) {
-    node.insertBefore(container, node.firstChild);
-  } else {
-    node.appendChild(container);
-  }
+  // Safe append inside message node (Child-Host pattern)
+  safeAppendChild(node, container);
 }
 
 function injectBookmarkButton(node) {
@@ -1777,7 +1826,7 @@ function injectBookmarkButton(node) {
   let msgId = node.getAttribute("data-bds-msg-id");
   if (!msgId) {
     msgId = "msg-" + Math.random().toString(36).substring(2, 11);
-    node.setAttribute("data-bds-msg-id", msgId);
+    safeSetAttribute(node, "data-bds-msg-id", msgId);
   }
 
   const isBookmarked = state.savedItems.some(item => item.messageNodeId === msgId && item.type === "bookmark");
@@ -1825,7 +1874,7 @@ function injectBookmarkButton(node) {
     if (already) {
       state.savedItems = state.savedItems.filter(item => !(item.messageNodeId === msgId && item.type === "bookmark"));
       await chrome.storage.local.set({ [STORAGE_KEYS.savedItems]: state.savedItems });
-      btn.classList.remove("bds-bookmark-btn--active");
+      safeRemoveClass(btn, "bds-bookmark-btn--active");
       const svg = btn.querySelector("svg");
       if (svg) svg.setAttribute("fill", "none");
       btn.title = i18n.t('savedItems.bookmarkThis');
@@ -1860,7 +1909,7 @@ function injectBookmarkButton(node) {
         conversationUrl: conversationUrl,
       });
       await chrome.storage.local.set({ [STORAGE_KEYS.savedItems]: state.savedItems });
-      btn.classList.add("bds-bookmark-btn--active");
+      safeAddClass(btn, "bds-bookmark-btn--active");
       const svg = btn.querySelector("svg");
       if (svg) svg.setAttribute("fill", "currentColor");
       btn.title = i18n.t('savedItems.removeBookmark');
@@ -1868,7 +1917,7 @@ function injectBookmarkButton(node) {
     }
   });
 
-  container.appendChild(btn);
+  safeAppendChild(container, btn);
   stateData.bookmarkInjected = true;
 }
 

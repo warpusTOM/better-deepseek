@@ -86,7 +86,11 @@ function getNodeTextCandidates(node) {
     ".md-code-block-banner",
     ".md-code-block-banner-wrap",
     "[class*=\"code-block-banner\"]",
-    // BDS injected run buttons
+    // BDS injected elements inside node
+    ".bds-host-wrapper",
+    ".bds-selection-checkbox-container",
+    ".bds-bookmark-btn",
+    ".bds-price-bubble",
     ".bds-run-btn"
   ];
 
@@ -184,7 +188,12 @@ export function extractMessageMarkdown(node) {
     "._74c0879",
     ".ds-icon",
     ".ds-icon-button",
-    "div[role=\"button\"]"
+    "div[role=\"button\"]",
+    ".bds-host-wrapper",
+    ".bds-selection-checkbox-container",
+    ".bds-bookmark-btn",
+    ".bds-price-bubble",
+    ".bds-run-btn"
   ];
   for (const s of noiseSelectors) {
     clone.querySelectorAll(s).forEach(el => el.remove());

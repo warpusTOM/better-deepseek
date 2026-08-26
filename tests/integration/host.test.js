@@ -5,9 +5,10 @@ import {
   getOrCreateHost,
   removeMessageHost,
   removeAllMessageHosts,
+  reconcileMessageHost,
 } from "../../src/content/dom/host.js";
 
-describe("host wrapper", () => {
+describe("host wrapper (Child-Host pattern)", () => {
   let msg;
 
   beforeEach(() => {
@@ -17,13 +18,14 @@ describe("host wrapper", () => {
     document.body.appendChild(msg);
   });
 
-  it("repeated wrapper creation for one message returns same wrapper", () => {
+  it("repeated wrapper creation for one message returns same wrapper inside message", () => {
     const w1 = getOrCreateWrapper(msg);
     const w2 = getOrCreateWrapper(msg);
     expect(w1).toBe(w2);
     expect(w1.className).toBe("bds-host-wrapper");
-    // Wrapper inserted after the message
-    expect(msg.nextElementSibling).toBe(w1);
+    // Wrapper appended inside the message as a child
+    expect(w1.parentElement).toBe(msg);
+    expect(msg.contains(w1)).toBe(true);
   });
 
   it("multiple feature hosts share same wrapper", () => {
@@ -34,6 +36,7 @@ describe("host wrapper", () => {
     expect(hostA.parentElement).toBe(wrapper);
     expect(hostB.parentElement).toBe(wrapper);
     expect(wrapper.childElementCount).toBe(2);
+    expect(wrapper.parentElement).toBe(msg);
   });
 
   it("repeated host creation for same class deduplicates", () => {
@@ -62,19 +65,22 @@ describe("host wrapper", () => {
 
     removeMessageHost(msg, "bds-overlay-host");
     expect(document.contains(wrapper)).toBe(false);
+    expect(msg.contains(wrapper)).toBe(false);
 
     // New call creates a fresh wrapper
     const fresh = getOrCreateWrapper(msg);
     expect(fresh).not.toBe(wrapper);
+    expect(fresh.parentElement).toBe(msg);
   });
 
-  it("pre-existing adjacent wrapper is rediscovered", () => {
+  it("pre-existing child wrapper is rediscovered", () => {
     const existing = document.createElement("div");
     existing.className = "bds-host-wrapper";
-    msg.insertAdjacentElement("afterend", existing);
+    msg.appendChild(existing);
 
     const wrapper = getOrCreateWrapper(msg);
     expect(wrapper).toBe(existing);
+    expect(wrapper.parentElement).toBe(msg);
   });
 
   it("full disposal removes wrapper and all feature hosts", () => {
@@ -85,31 +91,20 @@ describe("host wrapper", () => {
     removeAllMessageHosts(msg);
 
     expect(document.contains(wrapper)).toBe(false);
+    expect(msg.contains(wrapper)).toBe(false);
     // New call creates a fresh wrapper
     const fresh = getOrCreateWrapper(msg);
     expect(fresh).not.toBe(wrapper);
   });
 
-  it("reparenting moves wrapper into new parent adjacent to message", () => {
-    getOrCreateHost(msg, "bds-overlay-host");
+  it("reconcileMessageHost re-attaches wrapper if detached", () => {
     const wrapper = getOrCreateWrapper(msg);
+    wrapper.remove();
+    expect(msg.contains(wrapper)).toBe(false);
 
-    // Verify initial adjacency
-    expect(msg.nextElementSibling).toBe(wrapper);
-    expect(wrapper.previousElementSibling).toBe(msg);
-
-    // Move message to a new parent
-    const newParent = document.createElement("div");
-    newParent.id = "new-area";
-    document.body.appendChild(newParent);
-    newParent.appendChild(msg);
-
-    // Wrapper should be moved into new parent, adjacent to msg
-    const refound = getOrCreateWrapper(msg);
-    expect(refound).toBe(wrapper);
-    expect(wrapper.parentElement).toBe(newParent);
-    expect(msg.nextElementSibling).toBe(wrapper);
-    expect(wrapper.previousElementSibling).toBe(msg);
+    reconcileMessageHost(msg);
+    expect(msg.contains(wrapper)).toBe(true);
+    expect(wrapper.parentElement).toBe(msg);
   });
 
   it("wrapper owned by one message is not adopted by another", () => {
@@ -122,8 +117,8 @@ describe("host wrapper", () => {
     // msg2 should get its own wrapper, not adopt msg's
     const wrapper2 = getOrCreateWrapper(msg2);
     expect(wrapper2).not.toBe(wrapper);
-    expect(msg.nextElementSibling).toBe(wrapper);
-    expect(msg2.nextElementSibling).toBe(wrapper2);
+    expect(wrapper.parentElement).toBe(msg);
+    expect(wrapper2.parentElement).toBe(msg2);
   });
 
   it("wrapper creation for different messages is independent", () => {
@@ -135,32 +130,29 @@ describe("host wrapper", () => {
     const w2 = getOrCreateWrapper(msg2);
 
     expect(w1).not.toBe(w2);
-    expect(msg.nextElementSibling).toBe(w1);
-    expect(msg2.nextElementSibling).toBe(w2);
+    expect(w1.parentElement).toBe(msg);
+    expect(w2.parentElement).toBe(msg2);
   });
 
-  it("detach removes wrapper from DOM but preserves it off-DOM", () => {
+  it("detach removes wrapper when getOrCreateWrapper called off-DOM", () => {
     const host = getOrCreateHost(msg, "bds-overlay-host");
     const wrapper = getOrCreateWrapper(msg);
     expect(document.contains(wrapper)).toBe(true);
 
-    // Detach message — wrapper (sibling) stays in DOM until getOrCreateWrapper runs
+    // Detach message
     msg.remove();
     expect(document.contains(msg)).toBe(false);
 
-    // getOrCreateWrapper detects detached message, removes wrapper from DOM
     const refound = getOrCreateWrapper(msg);
     expect(refound).toBe(wrapper);
     expect(document.contains(wrapper)).toBe(false);
-    // Wrapper still tracked for message off-DOM
   });
 
-  it("reconnect reinserts same wrapper adjacent to message", () => {
+  it("reconnect restores wrapper inside message", () => {
     const host = getOrCreateHost(msg, "bds-overlay-host");
     const wrapper = getOrCreateWrapper(msg);
 
     msg.remove();
-    // Call getOrCreateWrapper to trigger wrapper detachment from DOM
     getOrCreateWrapper(msg);
     expect(document.contains(wrapper)).toBe(false);
 
@@ -172,24 +164,7 @@ describe("host wrapper", () => {
     const refound = getOrCreateWrapper(msg);
     expect(refound).toBe(wrapper);
     expect(document.contains(wrapper)).toBe(true);
-    expect(wrapper.parentElement).toBe(newParent);
-    expect(msg.nextElementSibling).toBe(wrapper);
-  });
-
-  it("feature host removal works on detached wrapper", () => {
-    const host = getOrCreateHost(msg, "bds-overlay-host");
-    const wrapper = getOrCreateWrapper(msg);
-
-    msg.remove();
-    // Trigger wrapper detachment from DOM
-    getOrCreateWrapper(msg);
-    expect(document.contains(wrapper)).toBe(false);
-
-    // Should still be able to remove a feature host from detached wrapper
-    removeMessageHost(msg, "bds-overlay-host");
-    expect(wrapper.querySelector(".bds-overlay-host")).toBeNull();
-    // Only feature host was removed, wrapper still detached (childless → removed)
-    expect(document.contains(wrapper)).toBe(false);
+    expect(wrapper.parentElement).toBe(msg);
   });
 
   it("permanent disposal clears ownership from both maps", () => {

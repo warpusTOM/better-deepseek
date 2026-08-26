@@ -6,6 +6,10 @@
  * inside the wrapper. This module is the single source of truth for host
  * lifecycle — other modules call these helpers rather than creating their
  * own wrapper/container elements.
+ *
+ * Child-Host Pattern:
+ * The wrapper is appended INSIDE the message node as its child rather than as
+ * a sibling. This prevents breaking React virtual list reconciliation and indexing.
  */
 
 const hostWrappers = new WeakMap();
@@ -32,21 +36,16 @@ export function reconcileMessageHost(node) {
     return wrapper;
   }
 
-  if (
-    !document.contains(wrapper) ||
-    wrapper.parentElement !== node.parentElement ||
-    wrapper.previousElementSibling !== node
-  ) {
-    node.insertAdjacentElement("afterend", wrapper);
+  if (!node.contains(wrapper) || wrapper.parentElement !== node) {
+    node.appendChild(wrapper);
   }
   return wrapper;
 }
 
 /**
  * Get or create the bds-host-wrapper for a message node.
- * A cached wrapper that is still in the document and adjacent to the message
- * is reused as-is. If the message has moved, the wrapper is reinserted
- * immediately after the message in its new parent.
+ * A cached wrapper that is still in the document and inside the message
+ * is reused as-is. If detached, the wrapper is re-appended to the message.
  */
 export function getOrCreateWrapper(node) {
   let wrapper = hostWrappers.get(node);
@@ -54,9 +53,9 @@ export function getOrCreateWrapper(node) {
   // Cached wrapper exists — handle based on connection state
   if (wrapper && wrapperOwner.get(wrapper) === node) {
     if (document.contains(node)) {
-      // Message is connected — ensure wrapper is adjacent in DOM
-      if (!document.contains(wrapper) || wrapper.previousElementSibling !== node) {
-        node.insertAdjacentElement("afterend", wrapper);
+      // Message is connected — ensure wrapper is a child of the message
+      if (!node.contains(wrapper) || wrapper.parentElement !== node) {
+        node.appendChild(wrapper);
       }
       return wrapper;
     }
@@ -73,17 +72,14 @@ export function getOrCreateWrapper(node) {
     wrapper = null;
   }
 
-  // Search existing siblings for a pre-existing but unowned wrapper
-  let sibling = node.nextElementSibling;
-  let attempts = 0;
-  while (sibling && attempts < 10) {
-    if (sibling.classList?.contains("ds-message")) break;
-    if (sibling.classList?.contains("bds-host-wrapper") && !wrapperOwner.has(sibling)) {
-      wrapper = sibling;
-      break;
+  // Search existing direct children for a pre-existing but unowned wrapper
+  if (node.children) {
+    for (const child of node.children) {
+      if (child.classList?.contains("bds-host-wrapper") && !wrapperOwner.has(child)) {
+        wrapper = child;
+        break;
+      }
     }
-    sibling = sibling.nextElementSibling;
-    attempts++;
   }
 
   if (!wrapper) {
@@ -91,7 +87,9 @@ export function getOrCreateWrapper(node) {
     wrapper.className = "bds-host-wrapper";
   }
 
-  node.insertAdjacentElement("afterend", wrapper);
+  if (wrapper.parentElement !== node) {
+    node.appendChild(wrapper);
+  }
   adoptWrapper(wrapper, node);
   return wrapper;
 }

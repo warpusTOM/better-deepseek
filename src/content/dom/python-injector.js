@@ -94,7 +94,7 @@ function injectButton(block, preEl) {
 
     const code = preEl.textContent || "";
     const container = document.createElement("div");
-    block.parentNode.insertBefore(container, block.nextSibling);
+    block.appendChild(container);
 
     const instance = mount(CodeRunner, {
       target: container,

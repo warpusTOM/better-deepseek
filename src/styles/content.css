@@ -46,11 +46,37 @@ html.dark, body.dark, .dark :root {
 /* ── Hidden Messages ── */
 .bds-hidden-message {
   display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
   opacity: 0 !important;
   pointer-events: none !important;
-  visibility: hidden !important;
-  height: 0 !important;
-  overflow: hidden !important;
+}
+
+/* ── User Message Overlay ── */
+.bds-user-msg-overlay {
+  position: absolute;
+  inset: 0;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  z-index: 1;
+}
+
+/* ── Tag Hiding (CSS-based) ── */
+.bds-tag-hidden {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  color: transparent !important;
+}
+
+.bds-tag-hidden::after {
+  content: attr(data-bds-base-title);
+  font-size: 14px !important;
+  line-height: normal !important;
+  color: inherit !important;
+  visibility: visible !important;
 }
 
 /* ── Root Container ── */
@@ -885,11 +911,21 @@ textarea.bds-input,
   min-width: 0;
   overflow: hidden;
   box-sizing: border-box;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
   /* Never let DeepSeek's flex-based message list shrink/clip BDS content:
      shrunk items with overflow:hidden no longer contribute to the scroll
      height, which makes the card's bottom unreachable. */
   flex-shrink: 0;
   flex-grow: 0;
+}
+
+.bds-message-overlay,
+.bds-sanitized-text {
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
 .bds-tool-host,
@@ -1060,7 +1096,10 @@ textarea.bds-input,
 .bds-logo-link {
   text-decoration: none !important;
   color: inherit !important;
-  display: contents; /* Ensures it doesn't break flex/grid layouts */
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  cursor: pointer;
 }
 
 .bds-logo-link:hover {

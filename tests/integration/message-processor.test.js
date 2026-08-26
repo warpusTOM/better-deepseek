@@ -180,15 +180,15 @@ describe("message processor integration", () => {
       systemGenerating: false,
     };
     processMessageNode(node, 0, nodes, context);
-    const wrapper = node.nextElementSibling;
+    const wrapper = node.querySelector(".bds-host-wrapper");
 
     const newParent = document.createElement("section");
     document.body.appendChild(newParent);
     newParent.appendChild(node);
     processMessageNode(node, 0, nodes, context);
 
-    expect(node.nextElementSibling).toBe(wrapper);
-    expect(wrapper.parentElement).toBe(newParent);
+    expect(node.contains(wrapper)).toBe(true);
+    expect(wrapper.parentElement).toBe(node);
     expect(document.querySelectorAll(".bds-host-wrapper")).toHaveLength(1);
   });
 
@@ -231,7 +231,7 @@ describe("message processor integration", () => {
     staleOverlay.textContent = "stale duplicate";
     host.appendChild(staleOverlay);
     wrapper.appendChild(host);
-    node.insertAdjacentElement("afterend", wrapper);
+    node.appendChild(wrapper);
 
     processMessageNode(node);
 
@@ -637,6 +637,55 @@ describe("message processor integration", () => {
 
     expect(node.querySelector(".ds-markdown").textContent).toContain("Visible text");
     expect(node.querySelector(".ds-markdown").textContent).not.toContain("Hidden");
+  });
+
+  it("removes BetterDeepSeek tags from nested collapsible-text DOM without leaking HTML tags into text", () => {
+    const node = document.createElement("div");
+    node.className = "ds-message";
+    node.dataset.role = "user";
+    node.dataset.rawText = "<BetterDeepSeek>System Instructions</BetterDeepSeek>create a visualizer for me";
+
+    const collapsible = document.createElement("div");
+    collapsible.className = "ds-collapsible-text";
+    const innerDiv = document.createElement("div");
+    const span = document.createElement("span");
+    span.textContent = "<BetterDeepSeek>System Instructions</BetterDeepSeek>create a visualizer for me";
+    innerDiv.appendChild(span);
+    collapsible.appendChild(innerDiv);
+    node.appendChild(collapsible);
+    document.body.appendChild(node);
+
+    processMessageNode(node);
+
+    expect(span.textContent).toBe("create a visualizer for me");
+    expect(span.textContent).not.toContain("<div");
+    expect(span.textContent).not.toContain("<span");
+    expect(span.textContent).not.toContain("BetterDeepSeek");
+    expect(span.textContent).not.toContain("System Instructions");
+  });
+
+  it("preserves separate paragraph structure when stripping BDS tags from multi-node user messages", () => {
+    const node = document.createElement("div");
+    node.className = "ds-message";
+    node.dataset.role = "user";
+    node.dataset.rawText = "<BetterDeepSeek>System Instructions</BetterDeepSeek>Paragraph 1\nParagraph 2";
+
+    const container = document.createElement("div");
+    container.className = "ds-markdown";
+    const p1 = document.createElement("p");
+    p1.textContent = "<BetterDeepSeek>System Instructions</BetterDeepSeek>Paragraph 1";
+    const p2 = document.createElement("p");
+    p2.textContent = "Paragraph 2";
+    container.appendChild(p1);
+    container.appendChild(p2);
+    node.appendChild(container);
+    document.body.appendChild(node);
+
+    processMessageNode(node);
+
+    expect(p1.textContent).toBe("Paragraph 1");
+    expect(p2.textContent).toBe("Paragraph 2");
+    expect(container.querySelectorAll("p")).toHaveLength(2);
   });
 
   it("speaks the latest settled assistant response once in voice mode", () => {

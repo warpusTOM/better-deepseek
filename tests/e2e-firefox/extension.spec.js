@@ -220,11 +220,11 @@ describe("Firefox extension", () => {
     const hostContract = await driver.executeScript(`
       var card = arguments[0];
       var wrapper = card.closest(".bds-host-wrapper");
-      var message = wrapper && wrapper.previousElementSibling;
+      var message = wrapper && wrapper.closest(".ds-message");
       var rect = wrapper && wrapper.getBoundingClientRect();
       return {
         hasWrapper: !!wrapper,
-        adjacentToMessage: !!(message && message.classList.contains("ds-message")),
+        insideMessage: !!(message && message.classList.contains("ds-message")),
         ownsExpectedMessage: !!(message && message.textContent.includes("Hello Firefox E2E")),
         display: wrapper ? getComputedStyle(wrapper).display : null,
         w: rect ? rect.width : 0,
@@ -232,7 +232,7 @@ describe("Firefox extension", () => {
       };
     `, card);
     expect(hostContract.hasWrapper).toBe(true);
-    expect(hostContract.adjacentToMessage).toBe(true);
+    expect(hostContract.insideMessage).toBe(true);
     expect(hostContract.ownsExpectedMessage).toBe(true);
     expect(hostContract.display).not.toBe("contents");
     expect(hostContract.w).toBeGreaterThan(0);

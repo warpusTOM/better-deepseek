@@ -166,26 +166,9 @@ function enhanceTable(table) {
 }
 
 function wrapHeaderText(th) {
-  const textNodes = [];
-  const walk = document.createTreeWalker(th, NodeFilter.SHOW_TEXT, null, false);
-  while (walk.nextNode()) {
-    const t = walk.currentNode;
-    if (t.textContent.trim()) textNodes.push(t);
-  }
-  if (textNodes.length === 0) return;
-  const span = document.createElement("span");
-  span.className = "bds-th-text";
-  for (const t of textNodes) {
-    span.appendChild(t.cloneNode(false));
-  }
-  for (const t of textNodes) {
-    t.remove();
-  }
-  if (th.firstChild) {
-    th.insertBefore(span, th.firstChild);
-  } else {
-    th.appendChild(span);
-  }
+  // Non-destructive: Preserve React-managed text nodes inside th
+  if (th.hasAttribute("data-bds-th-wrapped")) return;
+  th.setAttribute("data-bds-th-wrapped", "1");
 }
 
 function syncColIndexes(table) {

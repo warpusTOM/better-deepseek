@@ -1,9 +1,8 @@
 /**
- * Tag Hider — strips <tag> suffixes from sidebar titles.
+ * Tag Hider — strips <tag> suffixes from sidebar titles and BDS tags from popovers.
  *
- * Called during every scanPage() cycle. Finds all chat title elements
- * in the sidebar and hides the <tag1> <tag2> portions so they are
- * invisible to the user while remaining in the actual title data.
+ * Uses safeSetTextContent with MutationObserver paused so that DOM updates are
+ * handled cleanly without triggering recursive scan cycles or observer churn.
  */
 
 import state from "../state.js";
@@ -13,6 +12,7 @@ import {
   extractSessionId,
   getCurrentSessionId,
 } from "./tag-manager.js";
+import { safeSetTextContent, safeSetAttribute, safeRemoveAttribute } from "../dom/dom-safety.js";
 
 // Tag suffix pattern: one or more <word> at end of string
 const TAG_SUFFIX_REGEX = /(\s+<[^<>]+>)+\s*$/;
@@ -25,7 +25,12 @@ export function hideTagsInSidebar() {
   const titleElements = document.querySelectorAll(".c08e6e93");
 
   for (const el of titleElements) {
-    const fullText = el.textContent || "";
+    const liveText = el.textContent || "";
+    const stored = el.getAttribute("data-bds-full-title");
+    // If the live text matches the extracted base title from the stored full title,
+    // it means BDS previously stripped the tags and DOM hasn't been renamed.
+    // Otherwise, the element text was changed externally (e.g. chat rename).
+    const fullText = stored && liveText === extractBaseTitle(stored) ? stored : liveText;
 
     // Discovery: if title has tags, ensure they are in our state
     const link = el.closest('a[href*="/chat/s/"]');
@@ -38,22 +43,20 @@ export function hideTagsInSidebar() {
 
     // Skip if no tags in the text
     if (!TAG_SUFFIX_REGEX.test(fullText)) {
-      // If we previously stored a full title, check if the element was
-      // re-rendered by React with the full title visible again
-      const stored = el.getAttribute("data-bds-full-title");
-      if (stored && TAG_SUFFIX_REGEX.test(stored) && fullText === stored) {
-        // React re-rendered with full title, need to strip again
-        el.textContent = extractBaseTitle(stored);
+      if (stored) {
+        safeRemoveAttribute(el, "data-bds-full-title");
       }
       continue;
     }
 
     // Store the full title for later retrieval
-    el.setAttribute("data-bds-full-title", fullText);
+    safeSetAttribute(el, "data-bds-full-title", fullText);
 
     // Replace visible text with base title only
     const baseTitle = extractBaseTitle(fullText);
-    el.textContent = baseTitle;
+    if (liveText !== baseTitle) {
+      safeSetTextContent(el, baseTitle);
+    }
   }
 }
 
@@ -62,22 +65,31 @@ export function hideTagsInSidebar() {
  * at the top of the current conversation).
  */
 export function hideTagsInHeader() {
-  // DeepSeek's chat header title — may use a different selector
   const headerTitle = document.querySelector("._7436101");
   if (!headerTitle) return;
 
-  const text = headerTitle.textContent || "";
+  const liveText = headerTitle.textContent || "";
+  const stored = headerTitle.getAttribute("data-bds-full-title");
+  const fullText = stored && liveText === extractBaseTitle(stored) ? stored : liveText;
 
   // Discovery for header title
   const sessionId = getCurrentSessionId();
   if (sessionId) {
-    discoverTags(sessionId, text);
+    discoverTags(sessionId, fullText);
   }
 
-  if (!TAG_SUFFIX_REGEX.test(text)) return;
+  if (!TAG_SUFFIX_REGEX.test(fullText)) {
+    if (stored) {
+      safeRemoveAttribute(headerTitle, "data-bds-full-title");
+    }
+    return;
+  }
 
-  headerTitle.setAttribute("data-bds-full-title", text);
-  headerTitle.textContent = extractBaseTitle(text);
+  safeSetAttribute(headerTitle, "data-bds-full-title", fullText);
+  const baseTitle = extractBaseTitle(fullText);
+  if (liveText !== baseTitle) {
+    safeSetTextContent(headerTitle, baseTitle);
+  }
 }
 
 /**
@@ -124,8 +136,7 @@ export function hideBdsTagsInPopovers() {
 
     const cleaned = cleanBdsString(text);
 
-    el.setAttribute("data-bds-clean-text", cleaned);
-    el.textContent = cleaned;
+    safeSetAttribute(el, "data-bds-clean-text", cleaned);
+    safeSetTextContent(el, cleaned);
   }
 }
-
