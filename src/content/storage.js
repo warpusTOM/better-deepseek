@@ -394,6 +394,10 @@ export function normalizeMcpServers(raw) {
       })).filter(t => t.name) : [],
       enabled: s.enabled !== false,
       createdAt: Number(s.createdAt) || Date.now(),
+      presetId: String(s.presetId || ""),
+      transport: String(s.transport || "http"),
+      launchCommand: String(s.launchCommand || ""),
+      notes: String(s.notes || ""),
     }));
 }
 
@@ -636,3 +640,4 @@ export function bindStorageChangeListener() {
 
   return _storageCleanupRef;
 }
+

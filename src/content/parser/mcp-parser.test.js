@@ -41,6 +41,16 @@ describe("parseBdsMessage - MCP tags", () => {
     expect(result.autoRequests.mcpCalls[0].args).toEqual({ _raw: "{invalid json}" });
   });
 
+  it("repairs unescaped quotes inside MCP code arguments", () => {
+    const result = parseBdsMessage(
+      '<BDS:AUTO:MCP url="http://127.0.0.1:3197/mcp" tool="execute_luau" args=\'{"code":"print("Hello")","datamodel_type":"Edit"}\'></BDS:AUTO:MCP>',
+    );
+    expect(result.autoRequests.mcpCalls[0].args).toEqual({
+      code: 'print("Hello")',
+      datamodel_type: "Edit",
+    });
+  });
+
   it("skips tag when url attribute is missing", () => {
     const result = parseBdsMessage(
       '<BDS:AUTO:MCP tool="fetch_data" args=\'{"id":1}\'></BDS:AUTO:MCP>',

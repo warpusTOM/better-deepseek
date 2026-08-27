@@ -28,6 +28,27 @@ export const STORAGE_KEYS = {
   mcpServers: "bds_mcp_servers",
 };
 
+// ── MCP Presets ──
+// Built-in suggestions that can be added to the user's MCP server list.
+// These point at local proxies or widely useful transports rather than
+// remote third-party endpoints.
+export const MCP_PRESET_CATALOG = [
+  {
+    id: "roblox-studio",
+    name: "Roblox Studio",
+    description: "Use Roblox Studio's built-in MCP server through a local HTTP proxy for script edits, Luau execution, instance inspection, and playtesting.",
+    serverUrl: "http://127.0.0.1:3197/mcp",
+    transport: "stdio-proxy",
+    launchCommand: "node scripts/stdio-mcp-proxy.mjs --roblox --port 3197",
+    enabled: false,
+    notes: [
+      "Start the local proxy before enabling this server.",
+      "If Roblox Studio gives you a studio_id for the active instance, paste it into the proxy or append it as ?studio_id=<id> so every tool call targets the right Studio window.",
+      "The proxy bridges Roblox Studio's stdio MCP server to HTTP so Better DeepSeek can talk to it.",
+    ].join(" "),
+  },
+];
+
 
 // ── Bridge Events (content ↔ injected) ──
 export const BRIDGE_EVENTS = {
@@ -217,6 +238,12 @@ export const DEFAULT_SYSTEM_PROMPT = [
   "✓ When the user asks to interact with external tools, databases, or APIs connected via MCP.",
   "✓ When the available tool schemas indicate a tool that can answer the user's question.",
   "✓ Always prefer using an MCP tool over guessing or hallucinating data the tool can provide.",
+  "",
+  "ROBLOX STUDIO / LOCAL DESKTOP BRIDGES:",
+  "- Roblox Studio's MCP server runs as a local stdio process. Because Better DeepSeek only speaks HTTP/streamable HTTP MCP, use a local proxy that exposes the Studio server on localhost and then add that proxy URL in MCP Servers.",
+  "- When the Roblox Studio tool schema includes a `studio_id` field, pass it explicitly if multiple Studio windows are open.",
+  "- Prefer the Studio tools for script_read, multi_edit, script_search, script_grep, execute_luau, get_studio_state, start_stop_play, get_console_output, search_game_tree, inspect_instance, and asset tooling when they are available.",
+  "- For other desktop apps that expose stdio MCP, use the same pattern: wrap the stdio server with a local HTTP MCP proxy, then add the proxy endpoint here.",
   "",
   "DO NOT USE:",
   "✗ For tasks that MCP tools cannot address — use other BDS tools instead.",
@@ -1079,4 +1106,6 @@ export const CSS_PRESETS = {
 }`,
   },
 };
+
+
 

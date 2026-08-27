@@ -7,6 +7,7 @@
     SYSTEM_PROMPT_TEMPLATE_VERSION,
     DOWNLOAD_BEHAVIOR_VERSION,
     DEFAULT_SYSTEM_PROMPT,
+    MCP_PRESET_CATALOG,
   } from "../../lib/constants.js";
   import { getActiveProject, updateProject } from "../project-manager.js";
   import { t, i18n, availableLocaleCodes } from "../../lib/i18n.svelte.js";
@@ -1092,6 +1093,53 @@
     showMcpEditor = true;
   }
 
+  function buildMcpServerFromPreset(preset) {
+    return {
+      id: `mcp_${preset.id}_${Math.random().toString(36).substring(2, 9)}`,
+      name: preset.name,
+      serverUrl: preset.serverUrl,
+      apiKey: "",
+      enabled: preset.enabled !== false,
+      tools: [],
+      createdAt: Date.now(),
+      presetId: preset.id,
+      transport: preset.transport || "http",
+      launchCommand: preset.launchCommand || "",
+      notes: preset.notes || "",
+    };
+  }
+
+  async function copyMcpLaunchCommand(preset) {
+    const text = String(preset?.launchCommand || "").trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      if (appState.ui) appState.ui.showToast(`${preset.name} proxy command copied.`);
+    } catch (err) {
+      if (appState.ui) appState.ui.showToast(`Copy failed: ${err.message}`);
+    }
+  }
+
+  async function addMcpPreset(preset) {
+    if (!preset || !preset.serverUrl) return;
+    const duplicate = mcpServers.find(s => s.presetId === preset.id || s.serverUrl === preset.serverUrl);
+    if (duplicate) {
+      openMcpEditor(duplicate);
+      if (appState.ui) appState.ui.showToast(`${preset.name} is already added.`);
+      return;
+    }
+
+    const entry = buildMcpServerFromPreset(preset);
+    mcpServers = [...mcpServers, entry];
+    const plain = JSON.parse(JSON.stringify(mcpServers));
+    appState.mcpServers = plain;
+    await chrome.storage.local.set({ [STORAGE_KEYS.mcpServers]: plain });
+    await discoverMcpToolSchemas();
+    pushConfigToPage();
+    if (appState.ui) appState.ui.showToast(`${preset.name} preset added.`);
+    openMcpEditor(entry);
+  }
+
   function closeMcpEditor() {
     showMcpEditor = false;
     editingMcp = null;
@@ -1107,6 +1155,10 @@
       enabled: mcpEditorEnabled,
       tools: editingMcp ? editingMcp.tools : [],
       createdAt: editingMcp ? editingMcp.createdAt : Date.now(),
+      presetId: editingMcp && editingMcp.presetId ? editingMcp.presetId : "",
+      transport: editingMcp && editingMcp.transport ? editingMcp.transport : "http",
+      launchCommand: editingMcp && editingMcp.launchCommand ? editingMcp.launchCommand : "",
+      notes: editingMcp && editingMcp.notes ? editingMcp.notes : "",
     };
     if (mcpEditorIsNew) {
       mcpServers = [...mcpServers, entry];
@@ -2086,6 +2138,21 @@
       <div class="bds-sub-inner">
         <p style="font-size: 11px; opacity: 0.6; margin: 0 0 8px;">{t('mcp.description')}</p>
         <p style="font-size: 10px; opacity: 0.5; margin: -4px 0 8px;">{t('mcp.transportNote')}</p>
+        <div class="bds-mcp-preset-grid">
+          {#each MCP_PRESET_CATALOG as preset}
+            <div class="bds-skill-item bds-mcp-preset-card">
+              <div class="bds-prompt-info">
+                <span class="bds-prompt-name">{preset.name}</span>
+                <span class="bds-prompt-status">{preset.description}</span>
+                <span class="bds-mcp-preset-meta">{preset.serverUrl}</span>
+              </div>
+              <div class="bds-prompt-actions">
+                <button class="bds-btn-outlined" style="font-size: 11px; padding: 4px 8px;" onclick={() => copyMcpLaunchCommand(preset)} disabled={!preset.launchCommand}>Copy command</button>
+                <button class="bds-btn" style="font-size: 11px; padding: 4px 8px;" onclick={() => addMcpPreset(preset)}>Add preset</button>
+              </div>
+            </div>
+          {/each}
+        </div>
         {#each mcpServers as server, i}
           <div class="bds-skill-item">
             <div class="bds-prompt-info">
@@ -2829,4 +2896,28 @@
     opacity: 0.35;
     cursor: default;
   }
+
+  .bds-mcp-preset-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .bds-mcp-preset-card {
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .bds-mcp-preset-meta {
+    font-size: 10px;
+    color: var(--bds-text-tertiary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: block;
+    width: 100%;
+  }
 </style>
+
+

@@ -68,7 +68,31 @@ Better DeepSeek supports the [Model Context Protocol](https://spec.modelcontextp
 - **Test the connection**: Click "Test" to verify the server responds and list its available tools.
 - **How it works**: Tool schemas are injected into the system prompt. When the AI outputs `<BDS:AUTO:MCP url="..." tool="..." args='...'>`, the extension calls the tool and injects the result back into the conversation as an attached file.
 
-*Note: Only HTTP/Streamable HTTP transport is supported. Stdio-based MCP servers are not supported.*
+The extension speaks HTTP/Streamable HTTP. The included local proxy makes stdio-only MCP servers usable through that HTTP interface.
+
+#### Roblox Studio MCP
+
+This repository includes a Windows bridge for Roblox Studio's official local `StudioMCP.exe` server. It converts Roblox's newline-delimited stdio transport into an HTTP MCP endpoint for Better DeepSeek and repairs common AI-generated argument mistakes such as `path` vs. `target_file`.
+
+1. Build or download the extension and load `dist-chrome` in Chrome using Developer mode.
+2. Put `outputs/better-deepseek-mcp-connector.rbxm` into `%LOCALAPPDATA%\Roblox\Plugins`.
+3. Open Roblox Studio, open a place, and enable `Assistant Settings → MCP Servers → Enable Studio as MCP server`.
+4. Double-click `start-roblox-mcp.bat` once. It is safe to click again; it detects an existing healthy proxy instead of creating a duplicate port listener.
+5. In Better DeepSeek Settings → MCP Servers, add or use the `Roblox Studio` preset with this URL:
+   `http://127.0.0.1:3197/mcp`
+6. Click Test. The server should expose tools such as `execute_luau`, `script_read`, `script_search`, `multi_edit`, `get_studio_state`, and `search_game_tree`.
+
+To start the bridge automatically after Windows login, run `install-roblox-mcp-startup.bat` once. The proxy waits for Roblox Studio to reconnect when Studio opens.
+
+The connector package is a local Roblox Studio plugin and is credited to EdgeTypE's Better DeepSeek project. Roblox Studio MCP remains Roblox software and is subject to Roblox's terms and privacy requirements.
+
+For Roblox Studio and other stdio-only desktop MCP servers, run the local bridge first and then add the HTTP proxy URL here:
+
+```bash
+npm run mcp:roblox-proxy
+```
+
+That proxy exposes Roblox Studio on `http://127.0.0.1:3197/mcp` by default. You can also use `node scripts/stdio-mcp-proxy.mjs --command <your stdio command...>` for other desktop apps.
 
 ### LONG_WORK Project Mode
 When building multi-file projects, DeepSeek can use the `<BDS:LONG_WORK>` tag. All files created inside this block are collected, zipped, and presented as a single download after the block closes. During generation, the user sees only a "Working..." indicator, keeping the chat clean.
@@ -492,4 +516,5 @@ Use it at your own risk. Better DeepSeek is an independent project and is not af
 - [Turndown](https://github.com/mixmark-io/turndown)
 
 > "Better DeepSeek" is an unofficial, independent, and community-driven open-source extension. It is NOT affiliated with, endorsed by, sponsored by, or officially connected to DeepSeek or DeepSeek AI in any way. All product names, logos, and brands are property of their respective owners.
+
 

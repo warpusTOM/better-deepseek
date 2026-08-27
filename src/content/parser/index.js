@@ -405,8 +405,8 @@ export function parseBdsMessage(rawText, isSettled = false) {
     const toolName = attrs.tool || attrs.toolName || "";
     const rawArgs = attrs.args || match[2] || "";
     if (!serverUrl || !toolName) continue;
-    let argsObj = {};
-    try { argsObj = JSON.parse(rawArgs); } catch { argsObj = { _raw: rawArgs.trim() }; }
+    const repairedArgs = parseLooseJson(rawArgs);
+    const argsObj = repairedArgs.value ?? { _raw: rawArgs.trim() };
     result.autoRequests.mcpCalls.push({ serverUrl, toolName, args: argsObj });
   }
 

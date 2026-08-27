@@ -18,6 +18,7 @@ import {
   loadStateFromStorage,
   normalizeCharacters,
   normalizeMemories,
+  normalizeMcpServers,
   normalizeProjectFiles,
   normalizeProjects,
   normalizeSavedItems,
@@ -27,6 +28,7 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_SYSTEM_PROMPT,
   DOWNLOAD_BEHAVIOR_VERSION,
+  MCP_PRESET_CATALOG,
   STORAGE_KEYS,
   SYSTEM_PROMPT_TEMPLATE_VERSION,
 } from "../../src/lib/constants.js";
@@ -94,6 +96,7 @@ describe("storage integration", () => {
       SYSTEM_PROMPT_TEMPLATE_VERSION,
     );
     expect(state.settings.autoDownloadFiles).toBe(false);
+    expect(state.settings.systemPrompt).toContain("ROBLOX STUDIO / LOCAL DESKTOP BRIDGES:");
     expect(state.settings.autoDownloadLongWorkZip).toBe(false);
     expect(chrome.storage.local.set).toHaveBeenCalled();
   });
@@ -785,3 +788,30 @@ describe("config-removal integration", () => {
     expect(configWrites).toHaveLength(0);
   });
 });
+  it("preserves MCP preset metadata and Roblox preset availability", () => {
+    expect(MCP_PRESET_CATALOG.some((preset) => preset.id === "roblox-studio")).toBe(true);
+
+    const normalized = normalizeMcpServers([
+      {
+        id: "mcp_roblox",
+        name: "Roblox Studio",
+        serverUrl: "http://127.0.0.1:3197/mcp",
+        apiKey: "",
+        enabled: true,
+        createdAt: 123,
+        presetId: "roblox-studio",
+        transport: "stdio-proxy",
+        launchCommand: "node scripts/stdio-mcp-proxy.mjs --roblox --port 3197",
+        notes: "local bridge",
+        tools: [{ name: "script_read", description: "", inputSchema: {} }],
+      },
+    ]);
+
+    expect(normalized[0].presetId).toBe("roblox-studio");
+    expect(normalized[0].transport).toBe("stdio-proxy");
+    expect(normalized[0].launchCommand).toContain("stdio-mcp-proxy.mjs");
+    expect(normalized[0].notes).toBe("local bridge");
+    expect(normalized[0].tools).toHaveLength(1);
+  });
+
+
