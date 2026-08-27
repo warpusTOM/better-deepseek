@@ -2140,9 +2140,9 @@
         <p style="font-size: 10px; opacity: 0.5; margin: -4px 0 8px;">{t('mcp.transportNote')}</p>
         <div class="bds-mcp-preset-grid">
           {#each MCP_PRESET_CATALOG as preset}
-            <div class="bds-skill-item bds-mcp-preset-card">
+            <div class="bds-skill-item bds-mcp-preset-card" class:highlighted={preset.highlight}>
               <div class="bds-prompt-info">
-                <span class="bds-prompt-name">{preset.name}</span>
+                <span class="bds-prompt-name">{preset.name}{#if preset.highlight}<span class="bds-mcp-highlight">VIBE CODING</span>{/if}</span>
                 <span class="bds-prompt-status">{preset.description}</span>
                 <span class="bds-mcp-preset-meta">{preset.serverUrl}</span>
               </div>
@@ -2907,6 +2907,23 @@
   .bds-mcp-preset-card {
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .bds-mcp-preset-card.highlighted {
+    border-color: rgba(83, 135, 255, 0.7);
+    box-shadow: inset 3px 0 0 #5387ff;
+  }
+
+  .bds-mcp-highlight {
+    display: inline-block;
+    margin-left: 7px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: #5387ff;
+    color: #fff;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    vertical-align: 2px;
   }
 
   .bds-mcp-preset-meta {

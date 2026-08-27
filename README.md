@@ -70,6 +70,10 @@ Better DeepSeek supports the [Model Context Protocol](https://spec.modelcontextp
 
 The extension speaks HTTP/Streamable HTTP. The included local proxy makes stdio-only MCP servers usable through that HTTP interface.
 
+### Roblox Vibe Coding
+
+Better DeepSeek supports a complete Roblox Studio vibe-coding loop through MCP: inspect the live place, find scripts and instances, read existing code, make focused edits, execute Luau, run playtests, inspect console output, and verify the result. The assistant is instructed to use evidence from Studio instead of inventing paths or guessing tool arguments.
+
 #### Roblox Studio MCP
 
 This repository includes a Windows bridge for Roblox Studio's official local `StudioMCP.exe` server. It converts Roblox's newline-delimited stdio transport into an HTTP MCP endpoint for Better DeepSeek and repairs common AI-generated argument mistakes such as `path` vs. `target_file`.
