@@ -799,7 +799,7 @@ export function buildMcpIntentBlock(userPrompt, state) {
   const roblox = servers.find((server) => {
     const haystack = `${server.name || ""} ${server.serverUrl || ""}`.toLowerCase();
     return server.enabled !== false && /roblox|3197/.test(haystack);
-  });
+  }) || { serverUrl: "http://127.0.0.1:3197/mcp" };
   const desktop = servers.find((server) => {
     const haystack = `${server.name || ""} ${server.serverUrl || ""}`.toLowerCase();
     return server.enabled !== false && /desktop|3198/.test(haystack);

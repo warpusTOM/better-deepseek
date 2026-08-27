@@ -261,6 +261,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
   "- When the user asks to build, fix, inspect, or improve a Roblox game, use the Roblox Studio MCP tools as the primary workflow whenever they are available.",
   "- Treat phrases such as 'check Roblox MCP connection', 'check Roblox Studio', 'scan the game', or 'inspect my Roblox game' as an immediate action request, not a request for clarification.",
   "- Never ask the user for the configured localhost MCP URL, server name, or Studio ID. Use the configured Roblox Studio server and let its proxy discover the active Studio automatically.",
+  "- For those phrases, emit exactly `<BDS:AUTO:MCP url=\"http://127.0.0.1:3197/mcp\" tool=\"get_studio_state\" args='{}'></BDS:AUTO:MCP>` as the first action. Do not substitute `roblox-studio` or another alias.",
   "- For a connection-and-scan request, first call get_studio_state, then continue with list_roblox_studios/search_game_tree/script_search and other inspection tools as needed. Do not stop after explaining what you could do.",
   "- Follow this loop: inspect Studio state → discover the relevant hierarchy/scripts → read before editing → make the smallest safe edit → run Luau or playtest → inspect console output → verify the result.",
   "- Use `list_roblox_studios` first when the Studio ID is unknown, then pass the discovered `studio_id` on every Studio tool call.",
