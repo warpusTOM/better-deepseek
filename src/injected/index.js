@@ -115,6 +115,7 @@ import { patchXmlHttpRequest } from "./xhr-patch.js";
       memories: [],
       activeCharacter: null,
       mcpToolSchemas: [],
+      mcpServers: [],
     },
     hasInjected: (id) => getInjectedChats().includes(id),
     markInjected: (id) => addInjectedChat(id),

@@ -478,6 +478,9 @@ export function buildHiddenPrefix(
     }
   }
 
+  const mcpIntentBlock = buildMcpIntentBlock(userPrompt, state);
+  if (mcpIntentBlock) blocks.push(mcpIntentBlock);
+
   return blocks.join("\n\n");
 }
 
@@ -787,6 +790,43 @@ export function buildMcpBlock(state, fingerprint) {
   }
 
   return result;
+}
+
+/** Convert common MCP requests into a concrete first action for the model. */
+export function buildMcpIntentBlock(userPrompt, state) {
+  const text = String(userPrompt || "").toLowerCase();
+  const servers = Array.isArray(state.config?.mcpServers) ? state.config.mcpServers : [];
+  const roblox = servers.find((server) => {
+    const haystack = `${server.name || ""} ${server.serverUrl || ""}`.toLowerCase();
+    return server.enabled !== false && /roblox|3197/.test(haystack);
+  });
+  const desktop = servers.find((server) => {
+    const haystack = `${server.name || ""} ${server.serverUrl || ""}`.toLowerCase();
+    return server.enabled !== false && /desktop|3198/.test(haystack);
+  });
+
+  const wantsRoblox = /roblox|studio\s+mcp|mcp\s+(connection|status|scan|game)|scan\s+(the\s+)?game/.test(text);
+  const wantsDesktop = /scan\s+(my\s+)?(pc|computer|workspace)|desktop\s+mcp|check\s+(my\s+)?(pc|computer)/.test(text);
+  if (wantsRoblox && roblox) {
+    return [
+      "<BetterDeepSeek>",
+      "[BDS:MCP_INTENT] The user requested Roblox MCP connection/status/game scanning.",
+      "Do not ask for the MCP URL, server name, Studio ID, or whether Studio is open: the extension already has the configured Roblox localhost server and the proxy auto-discovers the active Studio.",
+      "Immediately emit exactly one MCP call to verify the connection:",
+      `<BDS:AUTO:MCP url=\"${roblox.serverUrl}\" tool=\"get_studio_state\" args='{}'></BDS:AUTO:MCP>`,
+      "After the result, continue automatically with the requested game scan. Use list_roblox_studios only if the state call reports no active Studio.",
+      "</BetterDeepSeek>",
+    ].join("\n");
+  }
+  if (wantsDesktop && desktop) {
+    return [
+      "<BetterDeepSeek>",
+      "[BDS:MCP_INTENT] The user requested a local desktop MCP check or workspace scan.",
+      "Do not ask for the MCP URL: use the configured Desktop Vibe Coding server. Start with desktop_system_info or desktop_list_directory, then continue with the requested inspection.",
+      "</BetterDeepSeek>",
+    ].join("\n");
+  }
+  return "";
 }
 
 /**

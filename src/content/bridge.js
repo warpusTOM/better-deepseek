@@ -363,6 +363,11 @@ export async function pushConfigToPage() {
         }
         : null,
       mcpInlineMaxChars: Number(state.settings.mcpInlineMaxChars) || 8000,
+      mcpServers: state.mcpServers.map((server) => ({
+        name: server.name,
+        serverUrl: server.serverUrl,
+        enabled: server.enabled !== false,
+      })),
       modelInputLimits: state.remoteConfig?.modelInputLimits || {},
     };
 

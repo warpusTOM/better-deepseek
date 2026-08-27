@@ -43,6 +43,14 @@ export function normalizeConfig(config) {
       })).filter(s => s.serverName && s.toolName)
     : [];
 
+  const mcpServers = Array.isArray(config.mcpServers)
+    ? config.mcpServers.map((server) => ({
+        name: String(server?.name || ""),
+        serverUrl: String(server?.serverUrl || ""),
+        enabled: server?.enabled !== false,
+      })).filter((server) => server.name && server.serverUrl)
+    : [];
+
   return {
     systemPrompt: String(config.systemPrompt || ""),
     systemPromptEntries,
@@ -61,6 +69,7 @@ export function normalizeConfig(config) {
     deepResearch: normalizeDeepResearch(config.deepResearch),
     deepCode: normalizeDeepCode(config.deepCode),
     mcpToolSchemas,
+    mcpServers,
     mcpInlineMaxChars: Number(config.mcpInlineMaxChars) || 8000,
     modelInputLimits: config.modelInputLimits || {},
   };
