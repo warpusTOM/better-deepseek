@@ -274,7 +274,36 @@ function parseStudioList(result) {
   }
 }
 
-async function normalizeRobloxToolCall(body, bridge, state) {
+async function discoverStudioId(bridge, state, force = false) {
+  if (!force && state.studioId) return state.studioId;
+  if (state.studioIdPromise) return state.studioIdPromise;
+
+  state.studioIdPromise = bridge.call({
+    jsonrpc: "2.0",
+    id: `bds-studio-discovery-${randomUUID()}`,
+    method: "tools/call",
+    params: { name: "list_roblox_studios", arguments: {} },
+  }).then((result) => {
+    const studioId = parseStudioList(result)[0]?.id || "";
+    state.studioId = studioId;
+    return studioId;
+  }).catch((err) => {
+    state.studioId = "";
+    throw err;
+  }).finally(() => {
+    state.studioIdPromise = null;
+  });
+
+  return state.studioIdPromise;
+}
+
+function isDisconnectedStudioResult(result) {
+  if (!result?.isError) return false;
+  const text = result.content?.map((item) => item?.text || "").join(" ") || "";
+  return /not connected|no studio available|studio.*not found|unable to reach roblox studio/i.test(text);
+}
+
+async function normalizeRobloxToolCall(body, bridge, state, preferredStudioId = "") {
   if (body?.method !== "tools/call" || !body.params || typeof body.params !== "object") return;
   const toolName = body.params.name;
   if (!toolName || toolName === "list_roblox_studios") return;
@@ -303,21 +332,10 @@ async function normalizeRobloxToolCall(body, bridge, state) {
     args.datamodel_type = "Edit";
   }
 
-  if (!args.studio_id) {
-    if (!state.studioIdPromise) {
-      state.studioIdPromise = bridge.call({
-        jsonrpc: "2.0",
-        id: `bds-studio-discovery-${randomUUID()}`,
-        method: "tools/call",
-        params: { name: "list_roblox_studios", arguments: {} },
-      }).then((result) => parseStudioList(result)[0]?.id || "").catch((err) => {
-        state.studioIdPromise = null;
-        throw err;
-      });
-    }
-    const studioId = await state.studioIdPromise;
-    if (studioId) args.studio_id = studioId;
-  }
+  // In auto mode, never trust an ID supplied by the model: it may belong to
+  // a previous Studio process. Explicit URL/CLI IDs remain authoritative.
+  const studioId = preferredStudioId || await discoverStudioId(bridge, state);
+  if (studioId) args.studio_id = studioId;
 }
 
 async function main() {
@@ -334,7 +352,7 @@ async function main() {
   }
 
   const bridge = createProcessBridge(bridgeCommand.command, bridgeCommand.args, bridgeCommand.cwd || null);
-  const robloxState = { studioIdPromise: null };
+  const robloxState = { studioId: "", studioIdPromise: null };
   const sessionId = `stdio-${randomUUID()}`;
 
   const server = http.createServer(async (req, res) => {
@@ -378,8 +396,29 @@ async function main() {
     try {
       process.stdout.write(`[stdio-mcp-proxy] ${req.method} ${url.pathname} studio_id=${effectiveStudioId || "<none>"}\n`);
       if (body.method) process.stdout.write(`[stdio-mcp-proxy] method=${body.method}\n`);
-      if (parsed.roblox) await normalizeRobloxToolCall(body, bridge, robloxState);
-      const result = await bridge.call(body);
+      if (parsed.roblox) await normalizeRobloxToolCall(body, bridge, robloxState, effectiveStudioId);
+      let result;
+      try {
+        result = await bridge.call(body);
+      } catch (err) {
+        const canRefresh = parsed.roblox
+          && body.method === "tools/call"
+          && body.params?.name !== "list_roblox_studios"
+          && !effectiveStudioId
+          && /not connected|no studio available|studio.*not found/i.test(err.message || "");
+        if (!canRefresh) throw err;
+        robloxState.studioId = "";
+        body.params.arguments.studio_id = await discoverStudioId(bridge, robloxState, true);
+        process.stdout.write(`[stdio-mcp-proxy] refreshed studio_id=${body.params.arguments.studio_id || "<none>"}\n`);
+        result = await bridge.call(body);
+      }
+      if (isDisconnectedStudioResult(result) && parsed.roblox && body.method === "tools/call"
+        && body.params?.name !== "list_roblox_studios" && !effectiveStudioId) {
+        robloxState.studioId = "";
+        body.params.arguments.studio_id = await discoverStudioId(bridge, robloxState, true);
+        process.stdout.write(`[stdio-mcp-proxy] refreshed studio_id=${body.params.arguments.studio_id || "<none>"}\n`);
+        result = await bridge.call(body);
+      }
       res.writeHead(200, { "content-type": "application/json", "Mcp-Session-Id": sessionId });
       if (body.id === undefined || body.id === null) {
         res.end(JSON.stringify({ jsonrpc: "2.0", result: null }));
