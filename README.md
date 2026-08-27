@@ -90,6 +90,12 @@ To start the bridge automatically after Windows login, run `install-roblox-mcp-s
 
 The connector package is a local Roblox Studio plugin and is credited to EdgeTypE's Better DeepSeek project. Roblox Studio MCP remains Roblox software and is subject to Roblox's terms and privacy requirements.
 
+#### Desktop Vibe Coding MCP
+
+The included `scripts/desktop-mcp-server.mjs` exposes a localhost-only Desktop MCP server for the approved workspace. It provides system information, directory listing, text-file reading/search, process listing, port checks, confirmed file writes, and confirmed launching of Roblox Studio, Chrome, Notepad, or Calculator.
+
+Run it with `npm run mcp:desktop`, then add `http://127.0.0.1:3198/mcp` using the `Desktop Vibe Coding` preset. File access is restricted to the server's workspace root; writes and application launches require `confirm: true`. Use `start-better-deepseek-mcp.bat` to start Roblox and Desktop MCP together.
+
 For Roblox Studio and other stdio-only desktop MCP servers, run the local bridge first and then add the HTTP proxy URL here:
 
 ```bash

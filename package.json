@@ -13,6 +13,7 @@
     "build:source": "node build.js --source",
     "mcp:stdio-proxy": "node scripts/stdio-mcp-proxy.mjs",
     "mcp:roblox-proxy": "node scripts/stdio-mcp-proxy.mjs --roblox --port 3197",
+    "mcp:desktop": "node scripts/desktop-mcp-server.mjs",
     "sanitize": "node scripts/sanitize-dist.js",
     "pretest": "npm run build",
     "test": "npm run test:unit && npm run test:e2e && npm run test:e2e:firefox",

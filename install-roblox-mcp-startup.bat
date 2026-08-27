@@ -2,7 +2,7 @@
 setlocal
 
 set "ROOT=%~dp0"
-set "LAUNCHER=%ROOT%start-roblox-mcp.bat"
+set "LAUNCHER=%ROOT%start-better-deepseek-mcp.bat"
 
 if not exist "%LAUNCHER%" (
   echo Could not find "%LAUNCHER%".
@@ -18,7 +18,7 @@ if errorlevel 1 (
   exit /b 1
 )
 
-echo Automatic Roblox MCP startup is installed.
+echo Automatic Roblox and Desktop MCP startup is installed.
 echo The proxy will start after the next Windows login.
 echo You can also launch "%LAUNCHER%" now.
 pause

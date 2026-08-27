@@ -48,6 +48,17 @@ export const MCP_PRESET_CATALOG = [
       "The proxy bridges Roblox Studio's stdio MCP server to HTTP so Better DeepSeek can talk to it.",
     ].join(" "),
   },
+  {
+    id: "desktop-local",
+    name: "Desktop Vibe Coding",
+    description: "Inspect and update the approved local workspace, check processes and ports, and launch approved apps.",
+    serverUrl: "http://127.0.0.1:3198/mcp",
+    transport: "http",
+    launchCommand: "npm run mcp:desktop",
+    enabled: true,
+    highlight: true,
+    notes: "Localhost-only desktop tools. File access is limited to the directory where the server starts; writes and app launches require confirm=true.",
+  },
 ];
 
 
